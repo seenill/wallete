@@ -1,0 +1,1447 @@
+openapi: 3.1.0
+info:
+  title: Wallet API
+  version: "1.0.0"
+  description: |
+    基于 Gin 的以太坊钱包 API。文档覆盖当前路由注册的接口（见 api/router/router.go）。
+servers:
+  - url: http://localhost:8080
+    description: 本地开发服务器（如端口有变动请对应修改）
+tags:
+  - name: Health
+    description: 健康检查
+  - name: Wallets
+    description: 钱包相关接口（导入助记词、查询余额、nonce 等）
+  - name: Networks
+    description: 网络相关，如 gas 建议
+  - name: Transactions
+    description: 转账、估算 gas、广播原始交易、查询回执
+  - name: Tokens
+    description: ERC20 相关信息
+  - name: Sign
+    description: 消息与 EIP-712 typed data 签名
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: 健康检查
+      responses:
+        "200":
+          description: 服务可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseHealth'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    message: 钱包服务运行正常
+
+  /api/v1/wallets/import-mnemonic:
+    post:
+      tags: [Wallets]
+      summary: 导入助记词并返回派生地址（不保存助记词）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportMnemonicRequest'
+            examples:
+              default:
+                value:
+                  name: "My Wallet"
+                  mnemonic: "test test test test test test test test test test test junk"
+                  derivation_path: "m/44'/60'/0'/0/0"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseAddress'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: "ok"
+                    data:
+                      address: "0xEeEE000000000000000000000000000000000000"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/wallets/{address}/balance:
+    get:
+      tags: [Wallets]
+      summary: 查询地址 ETH 余额（wei）
+      parameters:
+        - $ref: '#/components/parameters/PathAddress'
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseBalance'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      address: "0x1111111111111111111111111111111111111111"
+                      balance_wei: "1234500000000000000"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/wallets/{address}/tokens/{tokenAddress}/balance:
+    get:
+      tags: [Wallets]
+      summary: 查询地址的某个 ERC20 余额（最小单位）
+      parameters:
+        - $ref: '#/components/parameters/PathAddress'
+        - name: tokenAddress
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ERC20 合约地址
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseERC20Balance'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      address: "0x1111111111111111111111111111111111111111"
+                      token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                      balance: "1234567890"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/wallets/{address}/nonce:
+    get:
+      tags: [Wallets]
+      summary: 获取地址的 latest 与 pending nonce
+      parameters:
+        - $ref: '#/components/parameters/PathAddress'
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseNonces'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      address: "0x1111111111111111111111111111111111111111"
+                      nonce_latest: 100
+                      nonce_pending: 101
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/networks/gas-suggestion:
+    get:
+      tags: [Networks]
+      summary: 获取 EIP-1559 与 legacy Gas 建议
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseGasSuggestion'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      chain_id: "1"
+                      base_fee: "20000000000"
+                      tip_cap: "1500000000"
+                      max_fee: "43000000000"
+                      gas_price: "21000000000"
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/transactions/send:
+    post:
+      tags: [Transactions]
+      summary: 发送 ETH 交易（支持 session_id 或 mnemonic 二选一）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendTransactionRequest'
+            examples:
+              byMnemonic:
+                value:
+                  mnemonic: "test test test test test test test test test test test junk"
+                  derivation_path: "m/44'/60'/0'/0/0"
+                  to: "0x2222222222222222222222222222222222222222"
+                  value_wei: "2100000000000000"
+              bySession:
+                value:
+                  session_id: "8a1f0b9d1c764a0cbf2ea1f4a8b3c9d0"
+                  derivation_path: "m/44'/60'/0'/0/0"
+                  to: "0x2222222222222222222222222222222222222222"
+                  value_wei: "1000000000000000"
+      responses:
+        "200":
+          description: 已发送，返回交易哈希
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseTxHash'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      tx_hash: "0xaaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/transactions/send-erc20:
+    post:
+      tags: [Transactions]
+      summary: 发送 ERC20 转账（支持 session_id 或 mnemonic 二选一）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendERC20Request'
+            examples:
+              byMnemonic:
+                value:
+                  mnemonic: "test test test test test test test test test test test junk"
+                  derivation_path: "m/44'/60'/0'/0/0"
+                  token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  to: "0x3333333333333333333333333333333333333333"
+                  amount: "1000000"
+              bySession:
+                value:
+                  session_id: "8a1f0b9d1c764a0cbf2ea1f4a8b3c9d0"
+                  derivation_path: "m/44'/60'/0'/0/0"
+                  token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  to: "0x3333333333333333333333333333333333333333"
+                  amount: "2500000"
+      responses:
+        "200":
+          description: 已发送，返回交易哈希
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseTxHash'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      tx_hash: "0xbbbbccccddddeeeeffff0000111122223333444455556666777788889999aaaa"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/transactions/estimate:
+    post:
+      tags: [Transactions]
+      summary: 估算交易 gasLimit（支持 ETH 转账或合约调用）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EstimateTxRequest'
+            examples:
+              transfer:
+                value:
+                  from: "0x1111111111111111111111111111111111111111"
+                  to: "0x2222222222222222222222222222222222222222"
+                  value_wei: "1000000000000000"
+              contractCall:
+                value:
+                  from: "0x1111111111111111111111111111111111111111"
+                  to: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  data: "0xa9059cbb00000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000f4240"
+      responses:
+        "200":
+          description: 成功返回 gas limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseGasLimit'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      gas_limit: 52000
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/transactions/broadcast:
+    post:
+      tags: [Transactions]
+      summary: 广播原始签名交易（RLP Hex）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BroadcastTxRequest'
+            examples:
+              default:
+                value:
+                  raw_tx: "0x02f86b82012a8505d21dba00850430e2340082520894a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880de0b6b3a764000080c080a0..."
+      responses:
+        "200":
+          description: 成功返回交易哈希
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseTxHash'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      tx_hash: "0xccccddddeeeeffff0000111122223333444455556666777788889999aaaabbbb"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/transactions/{hash}/receipt:
+    get:
+      tags: [Transactions]
+      summary: 查询交易回执（失败时尝试返回 revert reason）
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 交易哈希
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseReceipt'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      tx_hash: "0xaaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999"
+                      status: 1
+                      block_number: "19680000"
+                      gas_used: "21000"
+                      effective_gas_price: "21000000000"
+                      transaction_index: 12
+                failedWithReason:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      tx_hash: "0xdeadbeef..."
+                      status: 0
+                      block_number: "19681234"
+                      gas_used: "65000"
+                      transaction_index: 2
+                      revert_reason: "transfer amount exceeds balance"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tokens/{token}/metadata:
+    get:
+      tags: [Tokens]
+      summary: 查询 ERC20 基础元数据（name/symbol/decimals）
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ERC20 合约地址
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseTokenMeta'
+              examples:
+                usdc:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      name: "USD Coin"
+                      symbol: "USDC"
+                      decimals: 6
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/sign/message:
+    post:
+      tags: [Sign]
+      summary: personal_sign 签名文本消息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignMessageRequest'
+            examples:
+              default:
+                value:
+                  mnemonic: "test test test test test test test test test test test junk"
+                  derivation_path: "m/44'/60'/0'/0/0"
+                  message: "Hello Ethereum"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseSignResult'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      address: "0xEeEE000000000000000000000000000000000000"
+                      signature: "0x..."
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/sign/typed:
+    post:
+      tags: [Sign]
+      summary: EIP-712 typed data v4 签名
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignTypedRequest'
+            examples:
+              mail:
+                value:
+                  mnemonic: "test test test test test test test test test test test junk"
+                  derivation_path: "m/44'/60'/0'/0/0"
+                  typed_data:
+                    types:
+                      EIP712Domain:
+                        - name: name
+                          type: string
+                        - name: version
+                          type: string
+                        - name: chainId
+                          type: uint256
+                        - name: verifyingContract
+                          type: address
+                      Person:
+                        - name: name
+                          type: string
+                        - name: wallet
+                          type: address
+                      Mail:
+                        - name: from
+                          type: Person
+                        - name: to
+                          type: Person
+                        - name: contents
+                          type: string
+                    primaryType: Mail
+                    domain:
+                      name: "Ether Mail"
+                      version: "1"
+                      chainId: 1
+                      verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"
+                    message:
+                      from:
+                        name: "Alice"
+                        wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"
+                      to:
+                        name: "Bob"
+                        wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"
+                      contents: "Hello, Bob!"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseSignResult'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      address: "0xEeEE000000000000000000000000000000000000"
+                      signature: "0x..."
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    PathAddress:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 以太坊地址
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StdError'
+          examples:
+            badRequest:
+              value:
+                code: 400
+                msg: "invalid params"
+                data: "详细错误信息"
+    InternalError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StdError'
+          examples:
+            internal:
+              value:
+                code: 500
+                msg: "internal error"
+                data: "详细错误信息"
+
+  schemas:
+    # 通用错误返回
+    StdError:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          nullable: true
+
+    # /health
+    StdResponseHealth:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+
+    # 通用成功返回（不同接口单独定义，便于 data 字段结构化）
+    StdResponseTxHash:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        msg:
+          type: string
+          example: ok
+        data:
+          type: object
+          properties:
+            tx_hash:
+              type: string
+
+    StdResponseAddress:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+              description: 派生出的地址（校验和格式）
+
+    StdResponseBalance:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+            balance_wei:
+              type: string
+
+    StdResponseERC20Balance:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+            token:
+              type: string
+              description: ERC20 合约地址
+            balance:
+              type: string
+              description: 最小单位的余额（十进制字符串）
+
+    StdResponseNonces:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+            nonce_latest:
+              type: integer
+              format: int64
+            nonce_pending:
+              type: integer
+              format: int64
+
+    StdResponseGasSuggestion:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            chain_id:
+              type: string
+            base_fee:
+              type: string
+            tip_cap:
+              type: string
+            max_fee:
+              type: string
+            gas_price:
+              type: string
+
+    StdResponseGasLimit:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            gas_limit:
+              type: integer
+              format: int64
+
+    StdResponseReceipt:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          $ref: '#/components/schemas/TxReceiptDTO'
+
+    StdResponseTokenMeta:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            name:
+              type: string
+            symbol:
+              type: string
+            decimals:
+              type: integer
+              format: int32
+
+    StdResponseSignResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+            signature:
+              type: string
+
+    # DTOs / Requests
+    ImportMnemonicRequest:
+      type: object
+      required: [mnemonic]
+      properties:
+        name:
+          type: string
+          description: 可选，名称
+        mnemonic:
+          type: string
+          description: 助记词（不保存）
+        derivation_path:
+          type: string
+          description: 默认为 "m/44'/60'/0'/0/0"
+
+    SendTransactionRequest:
+      type: object
+      required: [to, value_wei]
+      properties:
+        session_id:
+          type: string
+          description: 可选，与 mnemonic 二选一
+        mnemonic:
+          type: string
+          description: 可选，与 session_id 二选一
+        derivation_path:
+          type: string
+          description: 默认为 "m/44'/60'/0'/0/0"
+        to:
+          type: string
+        value_wei:
+          type: string
+          description: 十进制字符串
+
+    SendERC20Request:
+      type: object
+      required: [token, to, amount]
+      properties:
+        session_id:
+          type: string
+        mnemonic:
+          type: string
+        derivation_path:
+          type: string
+        token:
+          type: string
+          description: ERC20 合约地址
+        to:
+          type: string
+        amount:
+          type: string
+          description: token 最小单位（十进制字符串）
+
+    EstimateTxRequest:
+      type: object
+      required: [from]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+          nullable: true
+        value_wei:
+          type: string
+          nullable: true
+        data:
+          type: string
+          nullable: true
+          description: 0x 开头或纯 hex 的 calldata
+
+    BroadcastTxRequest:
+      type: object
+      required: [raw_tx]
+      properties:
+        raw_tx:
+          type: string
+          description: RLP 编码的已签名交易十六进制串
+
+    TxReceiptDTO:
+      type: object
+      properties:
+        tx_hash:
+          type: string
+        status:
+          type: integer
+          format: int32
+        block_number:
+          type: string
+        gas_used:
+          type: string
+        effective_gas_price:
+          type: string
+          nullable: true
+        contract_address:
+          type: string
+          nullable: true
+        transaction_index:
+          type: integer
+          format: int32
+        revert_reason:
+          type: string
+          nullable: true
+
+    SignMessageRequest:
+      type: object
+      required: [mnemonic, message]
+      properties:
+        mnemonic:
+          type: string
+        derivation_path:
+          type: string
+          description: 默认为 "m/44'/60'/0'/0/0"
+        message:
+          type: string
+
+    SignTypedRequest:
+      type: object
+      required: [mnemonic, typed_data]
+      properties:
+        mnemonic:
+          type: string
+        derivation_path:
+          type: string
+        typed_data:
+          type: object
+          description: 完整 EIP-712 JSON 结构（apitypes.TypedData）
+          additionalProperties: true
+
+    /wallets/import-mnemonic:
+      post:
+        tags:
+          - Wallets
+        summary: 导入助记词并返回派生地址（不保存助记词）
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportMnemonicRequest'
+            examples:
+              default:
+                value:
+                  name: "My Wallet"
+                  mnemonic: "test test test test test test test test test test test junk"
+                  derivation_path: "m/44'/60'/0'/0/0"
+        responses:
+          "200":
+            description: 成功
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/StdResponseAddress'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: "ok"
+                    data:
+                      address: "0xEeEE000000000000000000000000000000000000"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+    /wallets/new:
+      post:
+        tags:
+          - Wallets
+        summary: "Create a new wallet"
+        description: "Generates a new 12-word mnemonic and derives the first address."
+        responses:
+          "200":
+            description: "Successfully created a new wallet"
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    mnemonic:
+                      type: string
+                      example: "word1 word2 ... word12"
+                    address:
+                      type: string
+                      example: "0x..."
+          "500":
+            description: "Internal server error"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+    /wallets/{address}/balance:
+      get:
+        tags:
+          - Wallets
+        summary: 查询地址 ETH 余额（wei）
+        parameters:
+          - $ref: '#/components/parameters/PathAddress'
+        responses:
+          "200":
+            description: 成功
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/StdResponseBalance'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      address: "0x1111111111111111111111111111111111111111"
+                      balance_wei: "1234500000000000000"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tokens/{token}/metadata:
+    get:
+      tags: [Tokens]
+      summary: 查询 ERC20 基础元数据（name/symbol/decimals）
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ERC20 合约地址
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseTokenMeta'
+              examples:
+                usdc:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      name: "USD Coin"
+                      symbol: "USDC"
+                      decimals: 6
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/sign/message:
+    post:
+      tags: [Sign]
+      summary: personal_sign 签名文本消息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignMessageRequest'
+            examples:
+              default:
+                value:
+                  mnemonic: "test test test test test test test test test test test junk"
+                  derivation_path: "m/44'/60'/0'/0/0"
+                  message: "Hello Ethereum"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseSignResult'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      address: "0xEeEE000000000000000000000000000000000000"
+                      signature: "0x..."
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/sign/typed:
+    post:
+      tags: [Sign]
+      summary: EIP-712 typed data v4 签名
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignTypedRequest'
+            examples:
+              mail:
+                value:
+                  mnemonic: "test test test test test test test test test test test junk"
+                  derivation_path: "m/44'/60'/0'/0/0"
+                  typed_data:
+                    types:
+                      EIP712Domain:
+                        - name: name
+                          type: string
+                        - name: version
+                          type: string
+                        - name: chainId
+                          type: uint256
+                        - name: verifyingContract
+                          type: address
+                      Person:
+                        - name: name
+                          type: string
+                        - name: wallet
+                          type: address
+                      Mail:
+                        - name: from
+                          type: Person
+                        - name: to
+                          type: Person
+                        - name: contents
+                          type: string
+                    primaryType: Mail
+                    domain:
+                      name: "Ether Mail"
+                      version: "1"
+                      chainId: 1
+                      verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"
+                    message:
+                      from:
+                        name: "Alice"
+                        wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"
+                      to:
+                        name: "Bob"
+                        wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"
+                      contents: "Hello, Bob!"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StdResponseSignResult'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    msg: ok
+                    data:
+                      address: "0xEeEE000000000000000000000000000000000000"
+                      signature: "0x..."
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+    PathAddress:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 以太坊地址
+
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StdError'
+          examples:
+            badRequest:
+              value:
+                code: 400
+                msg: "invalid params"
+                data: "详细错误信息"
+    InternalError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StdError'
+          examples:
+            internal:
+              value:
+                code: 500
+                msg: "internal error"
+                data: "详细错误信息"
+
+    # 通用错误返回
+    StdError:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          nullable: true
+
+    # /health
+    StdResponseHealth:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+
+    # 通用成功返回（不同接口单独定义，便于 data 字段结构化）
+    StdResponseTxHash:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        msg:
+          type: string
+          example: ok
+        data:
+          type: object
+          properties:
+            tx_hash:
+              type: string
+
+    StdResponseAddress:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+              description: 派生出的地址（校验和格式）
+
+    StdResponseBalance:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+            balance_wei:
+              type: string
+
+    StdResponseERC20Balance:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+            token:
+              type: string
+              description: ERC20 合约地址
+            balance:
+              type: string
+              description: 最小单位的余额（十进制字符串）
+
+    StdResponseNonces:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+            nonce_latest:
+              type: integer
+              format: int64
+            nonce_pending:
+              type: integer
+              format: int64
+
+    StdResponseGasSuggestion:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            chain_id:
+              type: string
+            base_fee:
+              type: string
+            tip_cap:
+              type: string
+            max_fee:
+              type: string
+            gas_price:
+              type: string
+
+    StdResponseGasLimit:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            gas_limit:
+              type: integer
+              format: int64
+
+    StdResponseReceipt:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          $ref: '#/components/schemas/TxReceiptDTO'
+
+    StdResponseTokenMeta:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            name:
+              type: string
+            symbol:
+              type: string
+            decimals:
+              type: integer
+              format: int32
+
+    StdResponseSignResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            address:
+              type: string
+            signature:
+              type: string
+
+    # DTOs / Requests
+    ImportMnemonicRequest:
+      type: object
+      required: [mnemonic]
+      properties:
+        name:
+          type: string
+          description: 可选，名称
+        mnemonic:
+          type: string
+          description: 助记词（不保存）
+        derivation_path:
+          type: string
+          description: 默认为 "m/44'/60'/0'/0/0"
+
+    SendTransactionRequest:
+      type: object
+      required: [to, value_wei]
+      properties:
+        session_id:
+          type: string
+          description: 可选，与 mnemonic 二选一
+        mnemonic:
+          type: string
+          description: 可选，与 session_id 二选一
+        derivation_path:
+          type: string
+          description: 默认为 "m/44'/60'/0'/0/0"
+        to:
+          type: string
+        value_wei:
+          type: string
+          description: 十进制字符串
+
+    SendERC20Request:
+      type: object
+      required: [token, to, amount]
+      properties:
+        session_id:
+          type: string
+        mnemonic:
+          type: string
+        derivation_path:
+          type: string
+        token:
+          type: string
+          description: ERC20 合约地址
+        to:
+          type: string
+        amount:
+          type: string
+          description: token 最小单位（十进制字符串）
+
+    EstimateTxRequest:
+      type: object
+      required: [from]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+          nullable: true
+        value_wei:
+          type: string
+          nullable: true
+        data:
+          type: string
+          nullable: true
+          description: 0x 开头或纯 hex 的 calldata
+
+    BroadcastTxRequest:
+      type: object
+      required: [raw_tx]
+      properties:
+        raw_tx:
+          type: string
+          description: RLP 编码的已签名交易十六进制串
+
+    TxReceiptDTO:
+      type: object
+      properties:
+        tx_hash:
+          type: string
+        status:
+          type: integer
+          format: int32
+        block_number:
+          type: string
+        gas_used:
+          type: string
+        effective_gas_price:
+          type: string
+          nullable: true
+        contract_address:
+          type: string
+          nullable: true
+        transaction_index:
+          type: integer
+          format: int32
+        revert_reason:
+          type: string
+          nullable: true
+
+    SignMessageRequest:
+      type: object
+      required: [mnemonic, message]
+      properties:
+        mnemonic:
+          type: string
+        derivation_path:
+          type: string
+          description: 默认为 "m/44'/60'/0'/0/0"
+        message:
+          type: string
+
+    SignTypedRequest:
+      type: object
+      required: [mnemonic, typed_data]
+      properties:
+        mnemonic:
+          type: string
+        derivation_path:
+          type: string
+        typed_data:
+          type: object
+          description: 完整 EIP-712 JSON 结构（apitypes.TypedData）
+          additionalProperties: true

@@ -1,0 +1,157 @@
+name: crypto_wallet_flutter
+description: 企业级区块链钱包移动应用 - Flutter版本
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI组件
+  cupertino_icons: ^1.0.6
+  material_design_icons_flutter: ^7.0.7296
+  flutter_svg: ^2.0.7
+  cached_network_image: ^3.3.0
+  shimmer: ^3.0.0
+  
+  # 状态管理
+  provider: ^6.0.5
+  riverpod: ^2.4.5
+  flutter_riverpod: ^2.4.5
+  
+  # 导航
+  go_router: ^12.1.1
+  
+  # 网络请求
+  dio: ^5.3.2
+  retrofit: ^4.0.3
+  json_annotation: ^4.8.1
+  
+  # 本地存储
+  shared_preferences: ^2.2.2
+  sqflite: ^2.3.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  
+  # 安全存储
+  flutter_secure_storage: ^9.0.0
+  
+  # 加密和区块链
+  pointycastle: ^3.7.3
+  bip39: ^1.0.6
+  ed25519_hd_key: ^2.2.0
+  ethereum_addresses: ^1.0.2
+  web3dart: ^2.7.3
+  
+  # 生物识别
+  local_auth: ^2.1.6
+  
+  # 二维码
+  qr_flutter: ^4.1.0
+  qr_code_scanner: ^1.0.1
+  
+  # 设备信息
+  device_info_plus: ^9.1.0
+  package_info_plus: ^4.2.0
+  
+  # 权限
+  permission_handler: ^11.0.1
+  
+  # 图像处理
+  image_picker: ^1.0.4
+  
+  # 分享功能
+  share_plus: ^7.2.1
+  
+  # 剪贴板
+  flutter_clipboard_manager: ^0.0.4
+  
+  # 触觉反馈
+  vibration: ^1.8.4
+  
+  # 推送通知
+  firebase_messaging: ^14.7.5
+  flutter_local_notifications: ^16.1.0
+  
+  # WebView
+  webview_flutter: ^4.4.1
+  
+  # 图表
+  fl_chart: ^0.64.0
+  
+  # 动画
+  lottie: ^2.7.0
+  
+  # 国际化
+  intl: ^0.18.1
+  
+  # 工具类
+  logger: ^2.0.2+1
+  uuid: ^4.1.0
+  crypto: ^3.0.3
+  
+  # 主题
+  flex_color_scheme: ^7.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # 代码生成
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+  retrofit_generator: ^8.0.4
+  hive_generator: ^2.0.1
+  
+  # 代码检查
+  flutter_lints: ^3.0.1
+  
+  # 图标生成
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  
+  # 添加应用图标
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+    - assets/fonts/
+  
+  # 字体配置
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+
+# Flutter Launcher Icons配置
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  windows:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/icons/app_icon.png"

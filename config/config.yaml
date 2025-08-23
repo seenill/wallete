@@ -9,8 +9,88 @@ database:
   dbname: "wallet"
   sslmode: "disable"
 
-ethereum:
-  rpc_url: "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"
+# 多链网络配置
+networks:
+  ethereum:
+    name: "Ethereum Mainnet"
+    rpc_url: "https://eth.llamarpc.com"
+    chain_id: 1
+    symbol: "ETH"
+    decimals: 18
+    block_explorer: "https://etherscan.io"
+    enabled: true
+    testnet: false
+    max_gas_price: "50000000000" # 50 Gwei
+    min_confirmations: 12
+  
+  sepolia:
+    name: "Ethereum Sepolia Testnet"
+    rpc_url: "https://ethereum-sepolia-rpc.publicnode.com"
+    chain_id: 11155111
+    symbol: "ETH"
+    decimals: 18
+    block_explorer: "https://sepolia.etherscan.io"
+    enabled: true
+    testnet: true
+    max_gas_price: "20000000000" # 20 Gwei
+    min_confirmations: 3
+  
+  polygon:
+    name: "Polygon Mainnet"
+    rpc_url: "https://polygon-rpc.com"
+    chain_id: 137
+    symbol: "MATIC"
+    decimals: 18
+    block_explorer: "https://polygonscan.com"
+    enabled: true
+    testnet: false
+    max_gas_price: "500000000000" # 500 Gwei
+    min_confirmations: 20
+  
+  mumbai:
+    name: "Polygon Mumbai Testnet"
+    rpc_url: "https://rpc-mumbai.maticvigil.com"
+    chain_id: 80001
+    symbol: "MATIC"
+    decimals: 18
+    block_explorer: "https://mumbai.polygonscan.com"
+    enabled: true
+    testnet: true
+    max_gas_price: "50000000000" # 50 Gwei
+    min_confirmations: 5
+  
+  bsc:
+    name: "BNB Smart Chain"
+    rpc_url: "https://bsc-dataseed1.binance.org"
+    chain_id: 56
+    symbol: "BNB"
+    decimals: 18
+    block_explorer: "https://bscscan.com"
+    enabled: true
+    testnet: false
+    max_gas_price: "20000000000" # 20 Gwei
+    min_confirmations: 15
+  
+  bsc_testnet:
+    name: "BNB Smart Chain Testnet"
+    rpc_url: "https://data-seed-prebsc-1-s1.binance.org:8545"
+    chain_id: 97
+    symbol: "BNB"
+    decimals: 18
+    block_explorer: "https://testnet.bscscan.com"
+    enabled: true
+    testnet: true
+    max_gas_price: "10000000000" # 10 Gwei
+    min_confirmations: 3
+
+# 安全配置
+security:
+  jwt_secret: "your-jwt-secret-key-change-in-production"
+  encryption_key: "your-encryption-key-change-in-production"
+  rate_limit:
+    general: 100      # 通用API每分钟请求限制
+    transaction: 10   # 交易API每分钟请求限制
+    auth: 5          # 认证API每分钟请求限制
 
 keystore:
   path: "./keystores"
