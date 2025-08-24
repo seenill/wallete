@@ -884,22 +884,43 @@ func (h *WalletHandler) GetTransactionHistory(c *gin.Context) {
 	})
 }
 
+// CreateWalletRequest 创建钱包的请求参数
+type CreateWalletRequest struct {
+	Name string `json:"name"` // 钱包名称（可选）
+}
+
 // CreateWallet godoc
 // @Summary      Create a new wallet
 // @Description  Generates a new 12-word mnemonic and derives the first address.
 // @Tags         Wallets
 // @Accept       json
 // @Produce      json
-// @Success      200  {object}  map[string]string
+// @Success      200  {object}  map[string]interface{}
 // @Router       /wallets/new [post]
 func (h *WalletHandler) CreateWallet(c *gin.Context) {
+	var req CreateWalletRequest
+	// 绑定请求参数（如果有的话）
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// 如果绑定失败，可能是没有请求体，使用默认值
+		req.Name = "My Wallet"
+	}
+
 	mnemonic, address, err := h.walletService.CreateNewWallet()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": e.ErrorWalletImport,
+			"msg":  e.GetMsg(e.ErrorWalletImport),
+			"data": err.Error(),
+		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"mnemonic": mnemonic,
-		"address":  address,
+		"code": e.SUCCESS,
+		"msg":  e.GetMsg(e.SUCCESS),
+		"data": gin.H{
+			"address":  address,
+			"mnemonic": mnemonic,
+		},
 	})
 }

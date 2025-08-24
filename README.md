@@ -1,6 +1,37 @@
-# 以太坊钱包后端服务
+# 🦄 Ethereum Wallet - 以太坊钱包
 
-这是一个基于 Go Gin 框架构建的以太坊钱包后端服务。它提供了一套完整的 RESTful API，用于管理钱包、查询链上数据、发送交易、与 ERC20 代币交互以及进行数字签名。
+一个基于 Go + React 构建的完整以太坊钱包解决方案，提供安全、高效的数字资产管理服务。
+
+## 🎆 项目亮点
+
+- **🔒 安全可靠**: 助记词不存储，私钥本地管理
+- **💰 全面功能**: 支持ETH/ERC20转账、余额查询、交易历史
+- **🎨 现代化UI**: 响应式设计，支持桌面端和移动端
+- **⚡ 高性能**: Go后端 + React前端，快速响应
+- **🔧 开发友好**: 完整的API文档和类型定义
+
+## 🏠 项目架构
+
+```
+wallet/
+├── api/                    # Go 后端 API
+│   ├── handlers/          # HTTP 请求处理器
+│   ├── middleware/        # 中间件
+│   └── router/            # 路由配置
+├── core/                   # 核心业务逻辑
+├── services/               # 服务层
+├── web/                    # React 前端
+│   ├── src/
+│   │   ├── components/    # 组件
+│   │   ├── contexts/      # 状态管理
+│   │   ├── pages/         # 页面
+│   │   └── services/      # API封装
+│   └── README.md           # 前端文档
+├── config/                 # 配置文件
+├── main.go                 # 后端入口
+├── start.sh                # 快速启动脚本
+└── openapi.yaml            # API 文档
+```
 
 ## ✨ 功能特性
 
@@ -49,36 +80,57 @@
 - **/pkg**: 工具包，提供项目范围内的通用功能。
 - **main.go**: 项目入口文件。
 - **openapi.yaml**: API 规范文档。
-
 ## 🚀 快速开始
 
-### 环境要求
-- Go 1.18+
-- 一个以太坊节点 RPC URL (例如 [Infura](https://infura.io/) 或 [Alchemy](https://www.alchemy.com/))
+### 使用一键启动脚本
 
-### 安装与运行
-1. **克隆项目**:
-   ```bash
-   git clone https://github.com/your-username/wallet.git
-   cd wallet
-   ```
+```bash
+# 克隆项目
+git clone <repository-url>
+cd wallet
 
-2. **配置节点**:
-   打开 `config/config.yaml` 文件，将 `rpc_url` 修改为你的以太坊节点 RPC URL。
+# 一键启动（仅后端）
+./start.sh
+```
 
-3. **安装依赖**:
-   ```bash
-   go mod tidy
-   ```
+### 手动启动
 
-4. **运行服务**:
-   ```bash
-   go run main.go
-   ```
-   服务默认启动在 `http://localhost:8080`。
+#### 1. 启动后端服务
 
-### API 文档
-项目启动后，你可以通过 [Swagger Editor](https.editor.swagger.io/) 或其他兼容工具导入根目录下的 `openapi.yaml` 文件来查看和测试所有 API 接口。
+```bash
+# 安装依赖
+go mod tidy
+
+# 启动服务
+go run main.go
+```
+
+后端服务将在 `http://localhost:8080` 运行
+
+#### 2. 启动前端应用
+
+```bash
+# 进入前端目录
+cd web
+
+# 安装依赖
+npm install
+# 或使用 yarn
+yarn install
+
+# 启动开发服务器
+npm run dev
+# 或使用 yarn
+yarn dev
+```
+
+前端应用将在 `http://localhost:3000` 运行
+
+### 访问应用
+
+- **前端界面**: http://localhost:3000
+- **后端 API**: http://localhost:8080
+- **API 文档**: 导入 `openapi.yaml` 到 Swagger Editor
 
 ## 未来功能与改进
 

@@ -292,6 +292,26 @@ func isTransactionEndpoint(path string) bool {
 	return false
 }
 
+// CORS 跨域资源共享中间件
+func CORS() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin,Content-Type,Accept,Authorization,X-Requested-With,X-API-Key,X-User-Address")
+		c.Header("Access-Control-Expose-Headers", "Content-Length,X-Request-ID")
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Max-Age", "86400")
+
+		// 处理预检请求
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
+}
+
 // SecurityHeaders 安全头中间件
 func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {

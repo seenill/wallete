@@ -42,6 +42,7 @@ func NewRouter(walletService *services.WalletService) *gin.Engine {
 	r := gin.Default()
 
 	// 应用全局中间件（按顺序执行）
+	r.Use(middleware.CORS())            // CORS跨域支持
 	r.Use(middleware.ErrorHandler())    // 统一错误处理
 	r.Use(middleware.SecurityHeaders()) // HTTP安全头设置
 	r.Use(middleware.RequestID())       // 请求追踪ID生成
