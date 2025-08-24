@@ -1,0 +1,216 @@
+/* Receive.css */
+.receive {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.receive-not-connected {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+.receive-not-connected h2 {
+  color: #374151;
+  margin-bottom: 16px;
+}
+
+.receive-container h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.receive-description {
+  text-align: center;
+  color: #6b7280;
+  margin-bottom: 40px;
+  font-size: 16px;
+}
+
+.receive-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+.qr-section {
+  text-align: center;
+}
+
+.qr-code {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 16px;
+  display: inline-block;
+}
+
+.qr-image {
+  width: 200px;
+  height: 200px;
+  border-radius: 8px;
+}
+
+.qr-description {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.address-section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.address-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.address-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+.address-display {
+  display: flex;
+  gap: 8px;
+}
+
+.address-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 14px;
+  background: #f9fafb;
+  color: #374151;
+}
+
+.address-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.copy-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.copy-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.copy-button.copied {
+  background: #10b981;
+}
+
+.receive-tips,
+.network-info {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.receive-tips h4,
+.network-info h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.receive-tips ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.receive-tips li {
+  padding: 6px 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+  position: relative;
+  padding-left: 16px;
+}
+
+.receive-tips li::before {
+  content: '•';
+  color: #667eea;
+  font-weight: bold;
+  position: absolute;
+  left: 0;
+}
+
+.network-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.network-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.network-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.network-value {
+  color: #111827;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .receive-content {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  
+  .qr-image {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .address-display {
+    flex-direction: column;
+  }
+  
+  .copy-button {
+    align-self: flex-start;
+  }
+  
+  .address-card,
+  .receive-tips,
+  .network-info {
+    padding: 16px;
+  }
+}
