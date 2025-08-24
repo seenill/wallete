@@ -82,7 +82,9 @@ wallet/
 - **openapi.yaml**: API 规范文档。
 ## 🚀 快速开始
 
-### 使用一键启动脚本
+### 本地开发
+
+#### 使用一键启动脚本
 
 ```bash
 # 克隆项目
@@ -91,6 +93,20 @@ cd wallet
 
 # 一键启动（仅后端）
 ./start.sh
+```
+
+### 生产部署
+
+🌐 **想让别人通过互联网访问你的钱包服务？**
+
+- **5分钟快速部署**: 查看 [`QUICK_DEPLOY.md`](./QUICK_DEPLOY.md)
+- **完整部署指南**: 查看 [`DEPLOYMENT.md`](./DEPLOYMENT.md)
+- **一键部署脚本**: 运行 `./deploy.sh`
+
+```bash
+# 快速部署到云服务器
+./deploy.sh
+# 选择相应的部署选项即可
 ```
 
 ### 手动启动
@@ -131,6 +147,54 @@ yarn dev
 - **前端界面**: http://localhost:3000
 - **后端 API**: http://localhost:8080
 - **API 文档**: 导入 `openapi.yaml` 到 Swagger Editor
+
+## 🌍 部署到生产环境
+
+如果你希望将这个钱包服务部署到互联网上让其他人访问，我们提供了多种部署方案：
+
+### 📦 部署文档
+
+- **🚀 [快速部署指南](./QUICK_DEPLOY.md)** - 5分钟上线，适合新手
+- **📚 [完整部署指南](./DEPLOYMENT.md)** - 详细部署文档，包含安全配置
+
+### 🌐 部署方式对比
+
+| 部署方式 | 难度 | 适合场景 | 成本 |
+|------------|------|----------|------|
+| **云服务器** | ⭐⭐ | 小型项目、快速上线 | ¥45-200/月 |
+| **Docker容器** | ⭐⭐⭐ | 中型项目、需要扩展 | ¥45-200/月 |
+| **Serverless** | ⭐⭐⭐ | 不定期使用 | 按量付费 |
+
+### 🛠️ 一键部署
+
+使用提供的部署脚本：
+
+```bash
+# 运行部署脚本
+./deploy.sh
+
+# 菜单选项：
+# 1) 本地直接部署
+# 2) Docker容器部署 (推荐)
+# 3) 生产环境部署(含SSL)
+# 4) 云服务器初始化
+```
+
+### 🎆 部署成果
+
+部署完成后，你的服务将可以通过以下地址访问：
+
+- **API服务**: `https://your-domain.com/api/v1`
+- **健康检查**: `https://your-domain.com/health`
+- **网络信息**: `https://your-domain.com/api/v1/networks`
+
+**客户端访问示例**：
+```javascript
+// 访问你的API服务
+const response = await fetch('https://your-domain.com/api/v1/networks');
+const networks = await response.json();
+console.log('支持的网络:', networks.data);
+```
 
 ## 未来功能与改进
 

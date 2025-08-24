@@ -1,0 +1,61 @@
+server:
+  port: 8087
+
+# 生产环境不使用数据库，但保留配置以备将来扩展
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "password"
+  dbname: "wallet"
+  sslmode: "disable"
+
+# 多链网络配置 - 生产环境推荐使用付费节点
+networks:
+  ethereum:
+    name: "Ethereum Mainnet"
+    rpc_url: "https://eth.llamarpc.com"  # 建议替换为 Infura/Alchemy 付费节点
+    chain_id: 1
+    symbol: "ETH"
+    decimals: 18
+    block_explorer: "https://etherscan.io"
+    enabled: true
+    testnet: false
+    max_gas_price: "50000000000" # 50 Gwei
+    min_confirmations: 12
+  
+  polygon:
+    name: "Polygon Mainnet"
+    rpc_url: "https://polygon-rpc.com"  # 建议替换为付费节点
+    chain_id: 137
+    symbol: "MATIC"
+    decimals: 18
+    block_explorer: "https://polygonscan.com"
+    enabled: true
+    testnet: false
+    max_gas_price: "500000000000" # 500 Gwei
+    min_confirmations: 20
+  
+  bsc:
+    name: "BNB Smart Chain"
+    rpc_url: "https://bsc-dataseed1.binance.org"
+    chain_id: 56
+    symbol: "BNB"
+    decimals: 18
+    block_explorer: "https://bscscan.com"
+    enabled: true
+    testnet: false
+    max_gas_price: "20000000000" # 20 Gwei
+    min_confirmations: 15
+
+# 安全配置 - 生产环境必须修改这些密钥
+security:
+  jwt_secret: "your-super-secret-jwt-key-change-in-production-min-32-chars"
+  encryption_key: "your-encryption-key-change-in-production-exactly-32-chars"
+  rate_limit:
+    general: 1000     # 提高生产环境限制
+    transaction: 50   # 提高交易频率限制
+    auth: 20         # 提高认证频率限制
+
+keystore:
+  path: "/opt/wallet/keystores"  # 生产环境路径

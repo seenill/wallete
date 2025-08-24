@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  wallet-backend:
+    build: .
+    ports:
+      - "8087:8087"
+    environment:
+      - GIN_MODE=release
+      - SERVER_PORT=8087
+    volumes:
+      - ./config:/root/config:ro
+      - ./keystores:/root/keystores
+    restart: unless-stopped
+    networks:
+      - wallet-network
+
+  # 可选：添加Nginx反向代理
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - wallet-backend
+    restart: unless-stopped
+    networks:
+      - wallet-network
+
+networks:
+  wallet-network:
+    driver: bridge
+
+volumes:
+  wallet-data:

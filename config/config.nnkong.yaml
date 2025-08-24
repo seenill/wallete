@@ -1,0 +1,72 @@
+server:
+  port: 8087
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "password"
+  dbname: "wallet"
+  sslmode: "disable"
+
+# 多链网络配置
+networks:
+  ethereum:
+    name: "Ethereum Mainnet"
+    rpc_url: "https://eth.llamarpc.com"
+    chain_id: 1
+    symbol: "ETH"
+    decimals: 18
+    block_explorer: "https://etherscan.io"
+    enabled: true
+    testnet: false
+    max_gas_price: "50000000000" # 50 Gwei
+    min_confirmations: 12
+  
+  sepolia:
+    name: "Ethereum Sepolia Testnet"
+    rpc_url: "https://ethereum-sepolia-rpc.publicnode.com"
+    chain_id: 11155111
+    symbol: "ETH"
+    decimals: 18
+    block_explorer: "https://sepolia.etherscan.io"
+    enabled: true
+    testnet: true
+    max_gas_price: "20000000000" # 20 Gwei
+    min_confirmations: 3
+  
+  polygon:
+    name: "Polygon Mainnet"
+    rpc_url: "https://polygon-rpc.com"
+    chain_id: 137
+    symbol: "MATIC"
+    decimals: 18
+    block_explorer: "https://polygonscan.com"
+    enabled: true
+    testnet: false
+    max_gas_price: "500000000000" # 500 Gwei
+    min_confirmations: 20
+  
+  bsc:
+    name: "BNB Smart Chain"
+    rpc_url: "https://bsc-dataseed1.binance.org"
+    chain_id: 56
+    symbol: "BNB"
+    decimals: 18
+    block_explorer: "https://bscscan.com"
+    enabled: true
+    testnet: false
+    max_gas_price: "20000000000" # 20 Gwei
+    min_confirmations: 15
+
+# 安全配置 - nnkong.asiayu 专用
+security:
+  jwt_secret: "nnkong-f8e9c7b2d4a6578901234567890abcdef1234567890123456789abcdef123456"
+  encryption_key: "nnkong-32ch-encryption-key-789a"
+  rate_limit:
+    general: 1000     # 提高生产环境限制
+    transaction: 50   # 交易频率限制
+    auth: 20         # 认证频率限制
+
+keystore:
+  path: "/root/keystores"
