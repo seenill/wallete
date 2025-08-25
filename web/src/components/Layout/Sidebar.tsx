@@ -4,7 +4,9 @@ import { useWallet } from '../../contexts/WalletContext'
 import './Sidebar.css'
 
 function Sidebar() {
-  const { state } = useWallet()
+  // 从useWallet Hook中解构所需的值和方法
+  // state包含钱包状态，formatBalance是格式化余额的工具函数
+  const { state, formatBalance } = useWallet()
 
   if (!state.isConnected) {
     return null
@@ -58,7 +60,7 @@ function Sidebar() {
         <div className="sidebar-balance">
           <div className="balance-label">ETH 余额</div>
           <div className="balance-value">
-            {state.formatBalance(state.balance)} ETH
+            {formatBalance(state.balance)} ETH
           </div>
         </div>
       )}

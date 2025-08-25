@@ -3,7 +3,8 @@ import { useWallet } from '../contexts/WalletContext'
 import './Settings.css'
 
 function Settings() {
-  const { state, disconnectWallet } = useWallet()
+  // 从useWallet Hook中解构所需的状态和方法
+  const { state, disconnectWallet, formatBalance } = useWallet()
   const [showMnemonic, setShowMnemonic] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
 
@@ -56,7 +57,7 @@ function Settings() {
             <div className="setting-item">
               <div className="setting-label">ETH余额</div>
               <div className="setting-value">
-                {state.balance ? `${state.formatBalance(state.balance)} ETH` : '0 ETH'}
+                {state.balance ? `${formatBalance(state.balance)} ETH` : '0 ETH'}
               </div>
             </div>
           </div>

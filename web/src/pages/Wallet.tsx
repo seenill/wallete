@@ -17,12 +17,21 @@ function Wallet() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([])
 
+  /**
+   * 组件加载时初始化数据
+   * 当钱包地址变化时，重新加载余额和代币信息
+   */
   useEffect(() => {
-    if (state.address) {
-      updateBalance()
-      loadTokenBalances()
+    console.log('🔄 Wallet页面初始化', {
+      address: state.address,
+      isConnected: state.isConnected
+    })
+    
+    if (state.address && state.isConnected) {
+      // 加载余额和代币信息
+      handleRefresh()
     }
-  }, [state.address])
+  }, [state.address, state.isConnected])
 
   const loadTokenBalances = async () => {
     if (!state.address) return

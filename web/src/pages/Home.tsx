@@ -12,37 +12,114 @@ function Home() {
   const { state, importWallet, createWallet } = useWallet()
   const navigate = useNavigate()
 
-  // 如果已连接钱包，跳转到钱包页面
+  /**
+   * 监听钱包连接状态变化
+   * 当钱包成功连接且有有效地址时，跳转到钱包页面
+   * 
+   * 前端学习要点：
+   * 1. useEffect Hook - 处理副作用，监听状态变化
+   * 2. 依赖数组 - 只在指定值变化时才重新执行
+   * 3. 条件渲染 - 根据状态决定是否执行操作
+   */
   React.useEffect(() => {
-    if (state.isConnected) {
-      navigate('/wallet')
+    // 只有在钱包真正连接成功且有有效地址时才跳转
+    if (state.isConnected && state.address && !state.isLoading) {
+      console.log('✅ 钱包连接成功，跳转到钱包页面', {
+        address: state.address,
+        isConnected: state.isConnected,
+        isLoading: state.isLoading
+      })
+      
+      // 使用小延迟确保状态完全更新
+      const timer = setTimeout(() => {
+        navigate('/wallet')
+      }, 100)
+      
+      // 清理定时器防止内存泄漏
+      return () => clearTimeout(timer)
     }
-  }, [state.isConnected, navigate])
+  }, [state.isConnected, state.address, state.isLoading, navigate])
 
+  /**
+   * 处理导入钱包表单提交
+   * 
+   * @param e 表单提交事件
+   * 
+   * 执行流程：
+   * 1. 防止表单默认提交行为
+   * 2. 验证输入参数
+   * 3. 设置加载状态
+   * 4. 调用导入函数
+   * 5. 处理成功/失败情况
+   */
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!mnemonic.trim()) return
+    
+    // 验证输入参数
+    const cleanedMnemonic = mnemonic.trim()
+    if (!cleanedMnemonic) {
+      console.warn('⚠️ 助记词不能为空')
+      return
+    }
+    
+    if (!walletName.trim()) {
+      console.warn('⚠️ 钱包名称不能为空')
+      return
+    }
 
     setIsImporting(true)
+    
     try {
-      await importWallet(mnemonic.trim(), walletName)
+      console.log('🚀 开始导入钱包...', {
+        walletName: walletName.trim(),
+        mnemonicLength: cleanedMnemonic.split(' ').length
+      })
+      
+      await importWallet(cleanedMnemonic, walletName.trim())
+      
+      console.log('✅ 钱包导入成功，等待跳转...')
       // 成功后会自动跳转到钱包页面（通过上面的useEffect）
+      
     } catch (error) {
-      console.error('Import failed:', error)
+      console.error('❌ 导入钱包失败:', error)
+      
+      // 错误已经在WalletContext中处理，这里只需记录日志
     } finally {
       setIsImporting(false)
     }
   }
 
+  /**
+   * 处理创建钱包表单提交
+   * 
+   * @param e 表单提交事件
+   */
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // 验证输入参数
+    const cleanedWalletName = walletName.trim()
+    if (!cleanedWalletName) {
+      console.warn('⚠️ 钱包名称不能为空')
+      return
+    }
+    
     setIsCreating(true)
+    
     try {
-      await createWallet(walletName)
+      console.log('🚀 开始创建钱包...', {
+        walletName: cleanedWalletName
+      })
+      
+      await createWallet(cleanedWalletName)
+      
+      console.log('✅ 钱包创建成功，等待跳转...')
       // 成功后会自动跳转到钱包页面
+      
     } catch (error) {
-      console.error('Create failed:', error)
+      console.error('❌ 创建钱包失败:', error)
+      
+      // 错误已经在WalletContext中处理
     } finally {
       setIsCreating(false)
     }
