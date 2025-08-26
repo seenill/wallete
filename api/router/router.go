@@ -52,6 +52,8 @@ func NewRouter(walletService *services.WalletService) *gin.Engine {
 	// 创建各个业务处理器实例
 	walletHandler := handlers.NewWalletHandler(walletService)                                            // 钱包相关操作处理器
 	authHandler := handlers.NewAuthHandler()                                                             // 认证相关操作处理器
+	watchAddressHandler := handlers.NewWatchAddressHandler()                                             // 观察地址管理处理器
+	userWalletHandler := handlers.NewUserWalletHandler()                                                 // 用户钱包记录处理器
 	networkHandler := handlers.NewNetworkHandler(walletService)                                          // 网络相关操作处理器
 	defiHandler := handlers.NewDeFiHandler(walletService.GetDeFiService())                               // DeFi功能处理器
 	nftHandler := handlers.NewNFTHandler(walletService.GetNFTService())                                  // NFT功能处理器
@@ -60,30 +62,58 @@ func NewRouter(walletService *services.WalletService) *gin.Engine {
 	securityHandler := handlers.NewSecurityHandler(walletService.GetSecurityService())                   // 安全功能处理器
 	nftMarketplaceHandler := handlers.NewNFTMarketplaceHandler(walletService.GetNFTMarketplaceService()) // NFT市场处理器
 
-	// 认证相关路由组（公开接口，无需预先认证）
-	// 包括用户登录、Token管理、API密钥生成等功能
+	// 认证相关路由组（包含注册和用户管理功能）
+	// 包括用户注册、登录、Token管理、用户资料管理等功能
 	auth := r.Group("/api/v1/auth")
 	{
 		// 为认证接口应用特殊的速率限制（防暴力破解）
 		auth.Use(middleware.AuthRateLimit())
 
 		// 公开接口（无需认证）
-		auth.POST("/login", authHandler.Login) // 用户登录，获取JWT Token
+		auth.POST("/register", authHandler.Register)    // 用户注册
+		auth.POST("/login", authHandler.Login)          // 用户登录，获取JWT Token
+		auth.POST("/refresh", authHandler.RefreshToken) // 刷新JWT Token（使用refresh token）
 
 		// 需要JWT认证的接口
-		auth.POST("/api-key", middleware.JWTAuth(), authHandler.GenerateAPIKey) // 生成API密钥
-		auth.POST("/refresh", middleware.JWTAuth(), authHandler.RefreshToken)   // 刷新JWT Token
+		auth.POST("/logout", middleware.JWTAuth(), authHandler.Logout)          // 用户登出
 		auth.GET("/profile", middleware.JWTAuth(), authHandler.GetProfile)      // 获取用户资料
+		auth.PUT("/profile", middleware.JWTAuth(), authHandler.UpdateProfile)   // 更新用户资料
+		auth.PUT("/password", middleware.JWTAuth(), authHandler.ChangePassword) // 修改密码
+		auth.POST("/api-key", middleware.JWTAuth(), authHandler.GenerateAPIKey) // 生成API密钥
 	}
 
-	// API v1 主路由组（支持可选认证）
-	// 使用OptionalAuth中间件，允许既可以通过JWT认证也可以通过API密钥认证
+	// API v1 主路由组（需要用户认证）
+	// 使用JWTAuth中间件，确保所有接口都需要有效的JWT令牌
 	v1 := r.Group("/api/v1")
-	v1.Use(middleware.OptionalAuth()) // 灵活的认证机制，支持多种认证方式
+	v1.Use(middleware.JWTAuth()) // 统一的JWT认证机制
 	{
+		// 观察地址管理相关路由组
+		// 提供用户观察地址的增删改查功能
+		watchAddressGroup := v1.Group("/watch-addresses")
+		{
+			watchAddressGroup.POST("", watchAddressHandler.AddWatchAddress)          // 添加观察地址
+			watchAddressGroup.GET("", watchAddressHandler.GetWatchAddresses)         // 获取观察地址列表
+			watchAddressGroup.GET("/:id", watchAddressHandler.GetWatchAddress)       // 获取单个观察地址详情
+			watchAddressGroup.PUT("/:id", watchAddressHandler.UpdateWatchAddress)    // 更新观察地址
+			watchAddressGroup.DELETE("/:id", watchAddressHandler.DeleteWatchAddress) // 删除观察地址
+		}
+
+		// 用户钱包记录管理相关路由组
+		// 管理用户导入/创建的钱包记录
+		userWalletGroup := v1.Group("/user-wallets")
+		{
+			userWalletGroup.POST("", userWalletHandler.AddUserWallet)                    // 添加钱包记录
+			userWalletGroup.GET("", userWalletHandler.GetUserWallets)                    // 获取钱包记录列表
+			userWalletGroup.GET("/:id", userWalletHandler.GetUserWallet)                 // 获取单个钱包记录详情
+			userWalletGroup.PUT("/:id", userWalletHandler.UpdateUserWallet)              // 更新钱包记录
+			userWalletGroup.DELETE("/:id", userWalletHandler.DeleteUserWallet)           // 删除钱包记录
+			userWalletGroup.POST("/:id/set-primary", userWalletHandler.SetPrimaryWallet) // 设置主钱包
+		}
 		// 钱包管理相关路由组（支持HD钱包功能）
 		// 包括钱包创建、导入、余额查询和交易历史等核心功能
-		walletGroup := v1.Group("/wallets")
+		// 使用可选认证，兼容现有功能
+		walletGroup := r.Group("/api/v1/wallets")
+		walletGroup.Use(middleware.OptionalAuth()) // 灵活的认证机制
 		{
 			walletGroup.POST("/new", walletHandler.CreateWallet)                                     // 创建新钱包（生成助记词）
 			walletGroup.POST("/import-mnemonic", walletHandler.ImportMnemonic)                       // 通过助记词导入钱包
@@ -95,7 +125,8 @@ func NewRouter(walletService *services.WalletService) *gin.Engine {
 
 		// 多链网络管理路由组
 		// 支持动态网络切换、状态查询和跨链操作
-		networkGroup := v1.Group("/networks")
+		networkGroup := r.Group("/api/v1/networks")
+		networkGroup.Use(middleware.OptionalAuth()) // 灵活的认证机制
 		{
 			networkGroup.GET("/current", networkHandler.GetCurrentNetwork)                                                                         // 获取当前活跃网络信息
 			networkGroup.POST("/switch", networkHandler.SwitchNetwork)                                                                             // 切换到指定网络
@@ -108,7 +139,11 @@ func NewRouter(walletService *services.WalletService) *gin.Engine {
 		}
 
 		// Gas价格建议接口（全局可用）
-		v1.GET("/gas-suggestion", walletHandler.GetGasSuggestion) // 获取当前网络的Gas价格建议
+		gasGroup := r.Group("/api/v1")
+		gasGroup.Use(middleware.OptionalAuth())
+		{
+			gasGroup.GET("/gas-suggestion", walletHandler.GetGasSuggestion) // 获取当前网络的Gas价格建议
+		}
 
 		// DeFi功能相关路由组
 		// 提供去中心化金融服务，包括DEX交易、流动性挖矿、收益农场等

@@ -178,7 +178,12 @@ func (h *WatchAddressHandler) AddWatchAddress(c *gin.Context) {
 	// 准备标签数据
 	var tags models.JSON
 	if req.Tags != nil {
-		tags = models.JSON(req.Tags)
+		// 将map[string]string转换为models.JSON
+		tagsMap := make(map[string]interface{})
+		for k, v := range req.Tags {
+			tagsMap[k] = v
+		}
+		tags = models.JSON(tagsMap)
 	} else {
 		tags = models.JSON{}
 	}
@@ -452,8 +457,14 @@ func (h *WatchAddressHandler) UpdateWatchAddress(c *gin.Context) {
 	if req.NotificationEnabled != nil {
 		watchAddress.NotificationEnabled = *req.NotificationEnabled
 	}
+	// 更新标签
 	if req.Tags != nil {
-		watchAddress.Tags = models.JSON(req.Tags)
+		// 将map[string]string转换为models.JSON
+		tagsMap := make(map[string]interface{})
+		for k, v := range req.Tags {
+			tagsMap[k] = v
+		}
+		watchAddress.Tags = models.JSON(tagsMap)
 	}
 
 	// 保存更改

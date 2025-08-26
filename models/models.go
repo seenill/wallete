@@ -1,9 +1,8 @@
-package models
 /**
  * 数据模型定义包
- * 
+ *
  * 这个包定义了钱包应用的所有数据模型，使用GORM作为ORM框架
- * 
+ *
  * 后端学习要点：
  * 1. GORM标签 - 定义数据库字段映射和约束
  * 2. JSON标签 - 定义API响应时的JSON字段名
@@ -14,10 +13,11 @@ package models
 package models
 
 import (
-	"time"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -56,12 +56,12 @@ func (j *JSON) Scan(value interface{}) error {
 		*j = make(JSON)
 		return nil
 	}
-	
+
 	bytes, ok := value.([]byte)
 	if !ok {
 		return errors.New("cannot scan non-bytes into JSON")
 	}
-	
+
 	return json.Unmarshal(bytes, j)
 }
 
@@ -75,24 +75,24 @@ func (j *JSON) Scan(value interface{}) error {
  */
 type User struct {
 	BaseModel
-	
+
 	// 基本信息
-	Username    string     `gorm:"uniqueIndex;size:50;not null" json:"username"`
-	Email       string     `gorm:"uniqueIndex;size:100;not null" json:"email"`
-	PasswordHash string     `gorm:"size:255;not null" json:"-"` // 不在JSON中返回
-	Salt        string     `gorm:"size:255;not null" json:"-"` // 不在JSON中返回
-	AvatarURL   *string    `gorm:"size:500" json:"avatar_url,omitempty"`
-	
+	Username     string  `gorm:"uniqueIndex;size:50;not null" json:"username"`
+	Email        string  `gorm:"uniqueIndex;size:100;not null" json:"email"`
+	PasswordHash string  `gorm:"size:255;not null" json:"-"` // 不在JSON中返回
+	Salt         string  `gorm:"size:255;not null" json:"-"` // 不在JSON中返回
+	AvatarURL    *string `gorm:"size:500" json:"avatar_url,omitempty"`
+
 	// 状态信息
 	IsActive    bool       `gorm:"default:true" json:"is_active"`
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
-	
+
 	// 关联关系
-	Sessions      []UserSession   `gorm:"foreignKey:UserID" json:"sessions,omitempty"`
-	WatchAddresses []WatchAddress `gorm:"foreignKey:UserID" json:"watch_addresses,omitempty"`
-	Wallets       []UserWallet    `gorm:"foreignKey:UserID" json:"wallets,omitempty"`
-	Preferences   *UserPreference `gorm:"foreignKey:UserID" json:"preferences,omitempty"`
-	ActivityLogs  []ActivityLog   `gorm:"foreignKey:UserID" json:"activity_logs,omitempty"`
+	Sessions       []UserSession   `gorm:"foreignKey:UserID" json:"sessions,omitempty"`
+	WatchAddresses []WatchAddress  `gorm:"foreignKey:UserID" json:"watch_addresses,omitempty"`
+	Wallets        []UserWallet    `gorm:"foreignKey:UserID" json:"wallets,omitempty"`
+	Preferences    *UserPreference `gorm:"foreignKey:UserID" json:"preferences,omitempty"`
+	ActivityLogs   []ActivityLog   `gorm:"foreignKey:UserID" json:"activity_logs,omitempty"`
 }
 
 /**
@@ -101,16 +101,16 @@ type User struct {
  */
 type UserSession struct {
 	BaseModel
-	
-	UserID        uint      `gorm:"not null;index" json:"user_id"`
-	SessionToken  string    `gorm:"uniqueIndex;size:255;not null" json:"session_token"`
-	RefreshToken  string    `gorm:"uniqueIndex;size:255;not null" json:"refresh_token"`
-	DeviceInfo    JSON      `gorm:"type:jsonb" json:"device_info,omitempty"`
-	IPAddress     string    `gorm:"type:inet" json:"ip_address,omitempty"`
-	UserAgent     string    `gorm:"type:text" json:"user_agent,omitempty"`
-	ExpiresAt     time.Time `gorm:"not null;index" json:"expires_at"`
-	IsActive      bool      `gorm:"default:true" json:"is_active"`
-	
+
+	UserID       uint      `gorm:"not null;index" json:"user_id"`
+	SessionToken string    `gorm:"uniqueIndex;size:255;not null" json:"session_token"`
+	RefreshToken string    `gorm:"uniqueIndex;size:255;not null" json:"refresh_token"`
+	DeviceInfo   JSON      `gorm:"type:jsonb" json:"device_info,omitempty"`
+	IPAddress    string    `gorm:"type:inet" json:"ip_address,omitempty"`
+	UserAgent    string    `gorm:"type:text" json:"user_agent,omitempty"`
+	ExpiresAt    time.Time `gorm:"not null;index" json:"expires_at"`
+	IsActive     bool      `gorm:"default:true" json:"is_active"`
+
 	// 关联
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -121,15 +121,15 @@ type UserSession struct {
  */
 type UserPreference struct {
 	BaseModel
-	
-	UserID            uint   `gorm:"uniqueIndex;not null" json:"user_id"`
-	DefaultCurrency   string `gorm:"size:10;default:'USD'" json:"default_currency"`
-	Theme             string `gorm:"size:20;default:'light'" json:"theme"` // light, dark, auto
-	Language          string `gorm:"size:10;default:'zh-CN'" json:"language"`
-	Notifications     JSON   `gorm:"type:jsonb;default:'{}'" json:"notifications"`
-	DisplaySettings   JSON   `gorm:"type:jsonb;default:'{}'" json:"display_settings"`
-	PrivacySettings   JSON   `gorm:"type:jsonb;default:'{}'" json:"privacy_settings"`
-	
+
+	UserID          uint   `gorm:"uniqueIndex;not null" json:"user_id"`
+	DefaultCurrency string `gorm:"size:10;default:'USD'" json:"default_currency"`
+	Theme           string `gorm:"size:20;default:'light'" json:"theme"` // light, dark, auto
+	Language        string `gorm:"size:10;default:'zh-CN'" json:"language"`
+	Notifications   JSON   `gorm:"type:jsonb;default:'{}'" json:"notifications"`
+	DisplaySettings JSON   `gorm:"type:jsonb;default:'{}'" json:"display_settings"`
+	PrivacySettings JSON   `gorm:"type:jsonb;default:'{}'" json:"privacy_settings"`
+
 	// 关联
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -144,19 +144,19 @@ type UserPreference struct {
  */
 type WatchAddress struct {
 	BaseModel
-	
-	UserID              uint      `gorm:"not null;index" json:"user_id"`
-	Address             string    `gorm:"size:42;not null;index" json:"address"`
-	Label               *string   `gorm:"size:100" json:"label,omitempty"`
-	NetworkID           int       `gorm:"default:1;index" json:"network_id"` // 1=以太坊主网
-	AddressType         string    `gorm:"size:20;default:'EOA'" json:"address_type"` // EOA, Contract, MultiSig
-	Tags                JSON      `gorm:"type:jsonb" json:"tags,omitempty"`
-	Notes               *string   `gorm:"type:text" json:"notes,omitempty"`
-	IsFavorite          bool      `gorm:"default:false" json:"is_favorite"`
-	NotificationEnabled bool      `gorm:"default:true" json:"notification_enabled"`
-	BalanceCache        *string   `gorm:"type:decimal(36,18)" json:"balance_cache,omitempty"`
+
+	UserID              uint       `gorm:"not null;index" json:"user_id"`
+	Address             string     `gorm:"size:42;not null;index" json:"address"`
+	Label               *string    `gorm:"size:100" json:"label,omitempty"`
+	NetworkID           int        `gorm:"default:1;index" json:"network_id"`         // 1=以太坊主网
+	AddressType         string     `gorm:"size:20;default:'EOA'" json:"address_type"` // EOA, Contract, MultiSig
+	Tags                JSON       `gorm:"type:jsonb" json:"tags,omitempty"`
+	Notes               *string    `gorm:"type:text" json:"notes,omitempty"`
+	IsFavorite          bool       `gorm:"default:false" json:"is_favorite"`
+	NotificationEnabled bool       `gorm:"default:true" json:"notification_enabled"`
+	BalanceCache        *string    `gorm:"type:decimal(36,18)" json:"balance_cache,omitempty"`
 	LastActivityAt      *time.Time `json:"last_activity_at,omitempty"`
-	
+
 	// 关联
 	User           User                    `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	BalanceHistory []AddressBalanceHistory `gorm:"foreignKey:WatchAddressID" json:"balance_history,omitempty"`
@@ -168,7 +168,7 @@ type WatchAddress struct {
  */
 type UserWallet struct {
 	BaseModel
-	
+
 	UserID         uint       `gorm:"not null;index" json:"user_id"`
 	Address        string     `gorm:"size:42;not null;index" json:"address"`
 	WalletName     string     `gorm:"size:100;not null" json:"wallet_name"`
@@ -177,7 +177,7 @@ type UserWallet struct {
 	NetworkID      int        `gorm:"default:1" json:"network_id"`
 	IsPrimary      bool       `gorm:"default:false" json:"is_primary"`
 	LastUsedAt     *time.Time `json:"last_used_at,omitempty"`
-	
+
 	// 关联
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -188,14 +188,14 @@ type UserWallet struct {
  */
 type AddressBalanceHistory struct {
 	BaseModel
-	
-	WatchAddressID uint    `gorm:"not null;index" json:"watch_address_id"`
-	Balance        string  `gorm:"type:decimal(36,18);not null" json:"balance"`
-	TokenAddress   *string `gorm:"size:42;index" json:"token_address,omitempty"` // NULL表示主币
-	TokenSymbol    *string `gorm:"size:20" json:"token_symbol,omitempty"`
-	BlockNumber    *uint64 `json:"block_number,omitempty"`
+
+	WatchAddressID uint      `gorm:"not null;index" json:"watch_address_id"`
+	Balance        string    `gorm:"type:decimal(36,18);not null" json:"balance"`
+	TokenAddress   *string   `gorm:"size:42;index" json:"token_address,omitempty"` // NULL表示主币
+	TokenSymbol    *string   `gorm:"size:20" json:"token_symbol,omitempty"`
+	BlockNumber    *uint64   `json:"block_number,omitempty"`
 	RecordedAt     time.Time `gorm:"index;default:CURRENT_TIMESTAMP" json:"recorded_at"`
-	
+
 	// 关联
 	WatchAddress WatchAddress `gorm:"foreignKey:WatchAddressID" json:"watch_address,omitempty"`
 }
@@ -210,16 +210,16 @@ type AddressBalanceHistory struct {
  */
 type ActivityLog struct {
 	BaseModel
-	
-	UserID       *uint  `gorm:"index" json:"user_id,omitempty"` // 可为空，支持匿名操作记录
-	Action       string `gorm:"size:50;not null;index" json:"action"`
+
+	UserID       *uint   `gorm:"index" json:"user_id,omitempty"` // 可为空，支持匿名操作记录
+	Action       string  `gorm:"size:50;not null;index" json:"action"`
 	ResourceType *string `gorm:"size:50" json:"resource_type,omitempty"`
 	ResourceID   *string `gorm:"size:100" json:"resource_id,omitempty"`
-	Details      JSON   `gorm:"type:jsonb" json:"details,omitempty"`
+	Details      JSON    `gorm:"type:jsonb" json:"details,omitempty"`
 	IPAddress    *string `gorm:"type:inet" json:"ip_address,omitempty"`
 	UserAgent    *string `gorm:"type:text" json:"user_agent,omitempty"`
-	Status       string `gorm:"size:20;default:'success'" json:"status"` // success, failed, pending
-	
+	Status       string  `gorm:"size:20;default:'success'" json:"status"` // success, failed, pending
+
 	// 关联
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -253,11 +253,11 @@ func (u *User) GetActiveWallets(db *gorm.DB) ([]UserWallet, error) {
 func (u *User) GetWatchAddresses(db *gorm.DB, networkID *int) ([]WatchAddress, error) {
 	var addresses []WatchAddress
 	query := db.Where("user_id = ? AND deleted_at IS NULL", u.ID)
-	
+
 	if networkID != nil {
 		query = query.Where("network_id = ?", *networkID)
 	}
-	
+
 	err := query.Order("is_favorite DESC, created_at DESC").Find(&addresses).Error
 	return addresses, err
 }
@@ -272,12 +272,12 @@ func (wa *WatchAddress) UpdateBalance(db *gorm.DB, balance string, blockNumber *
 	wa.BalanceCache = &balance
 	wa.LastActivityAt = &time.Time{}
 	*wa.LastActivityAt = time.Now()
-	
+
 	// 保存到数据库
 	if err := db.Save(wa).Error; err != nil {
 		return err
 	}
-	
+
 	// 记录历史
 	history := AddressBalanceHistory{
 		WatchAddressID: wa.ID,
@@ -285,7 +285,7 @@ func (wa *WatchAddress) UpdateBalance(db *gorm.DB, balance string, blockNumber *
 		BlockNumber:    blockNumber,
 		RecordedAt:     time.Now(),
 	}
-	
+
 	return db.Create(&history).Error
 }
 
@@ -305,6 +305,6 @@ func LogUserAction(db *gorm.DB, userID *uint, action string, resourceType, resou
 		UserAgent:    userAgent,
 		Status:       "success",
 	}
-	
+
 	return db.Create(&log).Error
 }
