@@ -1,3 +1,16 @@
+package handlers
+
+import (
+	"net/http"
+	"strconv"
+	"time"
+
+	"wallet/pkg/e"
+	"wallet/services"
+
+	"github.com/gin-gonic/gin"
+)
+
 /*
 DApp浏览器API处理器
 
@@ -24,18 +37,6 @@ DApp浏览器API处理器
 - 风险等级评估
 - 钓鱼网站检测
 */
-package handlers
-
-import (
-	"net/http"
-	"strconv"
-	"time"
-
-	"wallet/pkg/e"
-	"wallet/services"
-
-	"github.com/gin-gonic/gin"
-)
 
 // DAppBrowserHandler DApp浏览器API处理器
 // 处理所有DApp浏览器相关的HTTP请求，包括连接管理、Web3请求、DApp发现等功能
