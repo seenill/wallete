@@ -308,7 +308,6 @@ func (ss *SecurityService) CreateMultiSigWallet(ctx context.Context, userAddress
 		ContractAddress:  contractAddress,
 		DeploymentTxHash: "0x" + fmt.Sprintf("%064x", time.Now().UnixNano()),
 	}
-
 	return response, nil
 }
 

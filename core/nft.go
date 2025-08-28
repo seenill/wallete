@@ -55,6 +55,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -383,18 +384,107 @@ func (n *NFTManager) detectNFTStandard(ctx context.Context, contractAddr string)
 	return "", fmt.Errorf("不支持的NFT标准")
 }
 
-// 简化的实现方法
-
 // supportsInterface 检查合约是否支持指定接口
 func (n *NFTManager) supportsInterface(ctx context.Context, contractAddr string, interfaceID [4]byte) (bool, error) {
-	// 简化实现：假设所有合约都支持ERC-721
-	return true, nil
+	// 定义 supportsInterface ABI
+	abiJSON := `[{
+		"inputs": [{"name": "interfaceId", "type": "bytes4"}],
+		"name": "supportsInterface",
+		"outputs": [{"name": "", "type": "bool"}],
+		"stateMutability": "view",
+		"type": "function"
+	}]`
+
+	parsedABI, err := abi.JSON(strings.NewReader(abiJSON))
+	if err != nil {
+		return false, fmt.Errorf("解析ABI失败: %w", err)
+	}
+
+	contractAddress := common.HexToAddress(contractAddr)
+	data, err := parsedABI.Pack("supportsInterface", interfaceID)
+	if err != nil {
+		return false, fmt.Errorf("打包数据失败: %w", err)
+	}
+
+	msg := ethereum.CallMsg{
+		To:   &contractAddress,
+		Data: data,
+	}
+
+	result, err := n.evmAdapter.CallContract(ctx, msg, nil)
+	if err != nil {
+		// 如果调用失败，可能是因为合约不支持supportsInterface方法
+		return false, nil
+	}
+
+	if len(result) < 32 {
+		return false, fmt.Errorf("返回数据长度不足")
+	}
+
+	// 解析结果（第一个布尔值在第32字节开始）
+	supports := result[31] == 1
+	return supports, nil
 }
 
 // getOwner 获取NFT所有者
 func (n *NFTManager) getOwner(ctx context.Context, contractAddr, tokenID, standard string) (string, error) {
-	// 简化实现：返回零地址
-	return "0x0000000000000000000000000000000000000000", nil
+	contractAddress := common.HexToAddress(contractAddr)
+
+	var data []byte
+	var err error
+
+	switch standard {
+	case "ERC-721":
+		// ERC-721 ownerOf ABI
+		abiJSON := `[{
+			"inputs": [{"name": "tokenId", "type": "uint256"}],
+			"name": "ownerOf",
+			"outputs": [{"name": "owner", "type": "address"}],
+			"stateMutability": "view",
+			"type": "function"
+		}]`
+
+		parsedABI, err := abi.JSON(strings.NewReader(abiJSON))
+		if err != nil {
+			return "", fmt.Errorf("解析ERC-721 ABI失败: %w", err)
+		}
+
+		tokenIDInt, ok := new(big.Int).SetString(tokenID, 10)
+		if !ok {
+			return "", fmt.Errorf("无效的tokenID: %s", tokenID)
+		}
+
+		data, err = parsedABI.Pack("ownerOf", tokenIDInt)
+		if err != nil {
+			return "", fmt.Errorf("打包ERC-721 ownerOf数据失败: %w", err)
+		}
+
+	case "ERC-1155":
+		// ERC-1155使用balanceOf检查用户是否拥有特定token
+		// 这里需要更多信息来正确实现，暂时返回空地址
+		return "0x0000000000000000000000000000000000000000", nil
+
+	default:
+		return "", fmt.Errorf("不支持的NFT标准: %s", standard)
+	}
+
+	msg := ethereum.CallMsg{
+		To:   &contractAddress,
+		Data: data,
+	}
+
+	result, err := n.evmAdapter.CallContract(ctx, msg, nil)
+	if err != nil {
+		return "", fmt.Errorf("调用合约失败: %w", err)
+	}
+
+	if len(result) < 32 {
+		return "", fmt.Errorf("返回数据长度不足")
+	}
+
+	// 解析地址（在第12-32字节）
+	owner := common.BytesToAddress(result[12:32])
+	return owner.Hex(), nil
 }
 
 // getMetadata 获取NFT元数据
@@ -429,8 +519,73 @@ func (n *NFTManager) getUserNFTsFromContract(ctx context.Context, userAddr, cont
 
 // transferERC721 转账ERC-721 NFT
 func (n *NFTManager) transferERC721(ctx context.Context, params *NFTTransferParams, mnemonic, derivationPath string) (string, error) {
-	// 简化实现：返回示例交易哈希
-	return "0x" + fmt.Sprintf("%x", time.Now().UnixNano()), nil
+	// 构建transferFrom ABI
+	abiJSON := `[{
+		"inputs": [
+			{"name": "from", "type": "address"},
+			{"name": "to", "type": "address"},
+			{"name": "tokenId", "type": "uint256"}
+		],
+		"name": "transferFrom",
+		"outputs": [],
+		"type": "function"
+	}]`
+
+	parsedABI, err := abi.JSON(strings.NewReader(abiJSON))
+	if err != nil {
+		return "", fmt.Errorf("解析ABI失败: %w", err)
+	}
+
+	fromAddr := common.HexToAddress(params.From)
+	toAddr := common.HexToAddress(params.To)
+	tokenIDInt, ok := new(big.Int).SetString(params.TokenID, 10)
+	if !ok {
+		return "", fmt.Errorf("无效的tokenID: %s", params.TokenID)
+	}
+
+	data, err := parsedABI.Pack("transferFrom", fromAddr, toAddr, tokenIDInt)
+	if err != nil {
+		return "", fmt.Errorf("打包数据失败: %w", err)
+	}
+
+	// 使用EVM适配器发送交易
+	contractAddr := common.HexToAddress(params.ContractAddr)
+
+	// 如果未指定GasPrice，使用默认值
+	gasPrice := params.GasPrice
+	if gasPrice == nil || gasPrice.Cmp(big.NewInt(0)) == 0 {
+		// 获取当前网络建议的Gas价格
+		gasSuggestion, err := n.evmAdapter.GetGasSuggestion(ctx)
+		if err != nil {
+			return "", fmt.Errorf("获取Gas建议失败: %w", err)
+		}
+		gasPrice = gasSuggestion.GasPrice
+	}
+
+	// 如果未指定GasLimit，使用默认值
+	gasLimit := params.GasLimit
+	if gasLimit == 0 {
+		// 估算Gas
+		msg := ethereum.CallMsg{
+			From:  fromAddr,
+			To:    &contractAddr,
+			Data:  data,
+			Value: big.NewInt(0),
+		}
+		estimatedGas, err := n.evmAdapter.client.EstimateGas(ctx, msg)
+		if err != nil {
+			return "", fmt.Errorf("估算Gas失败: %w", err)
+		}
+		// 增加20%的安全边际
+		gasLimit = uint64(float64(estimatedGas) * 1.2)
+	}
+
+	txHash, err := n.evmAdapter.SendContractTransaction(ctx, mnemonic, derivationPath, contractAddr, data, big.NewInt(0), big.NewInt(int64(gasLimit)), gasPrice)
+	if err != nil {
+		return "", fmt.Errorf("发送交易失败: %w", err)
+	}
+
+	return txHash, nil
 }
 
 // transferERC1155 转账ERC-1155 NFT

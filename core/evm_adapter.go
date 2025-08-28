@@ -1238,3 +1238,76 @@ func decodeRevertReason(data []byte) string {
 	}
 	return ""
 }
+
+// SendContractTransaction 发送智能合约交易
+// 参数:
+//
+//	ctx - 上下文对象
+//	mnemonic - BIP39助记词
+//	derivationPath - BIP44派生路径
+//	contractAddr - 合约地址
+//	data - 调用数据
+//	value - 转账金额（wei单位）
+//	gasLimit - Gas限制
+//	gasPrice - Gas价格
+//
+// 返回: 交易哈希和错误信息
+func (a *EVMAdapter) SendContractTransaction(ctx context.Context, mnemonic, derivationPath string, contractAddr common.Address, data []byte, value, gasLimit, gasPrice *big.Int) (string, error) {
+	priv, fromAddr, err := DerivePrivateKeyFromMnemonic(mnemonic, derivationPath)
+	if err != nil {
+		return "", err
+	}
+
+	chainID, err := a.client.NetworkID(ctx)
+	if err != nil {
+		return "", fmt.Errorf("获取链ID失败: %w", err)
+	}
+
+	nonce, err := a.client.PendingNonceAt(ctx, fromAddr)
+	if err != nil {
+		return "", fmt.Errorf("获取nonce失败: %w", err)
+	}
+
+	// 如果未指定gasLimit，估算gas
+	if gasLimit == nil || gasLimit.Cmp(big.NewInt(0)) == 0 {
+		msg := ethereum.CallMsg{
+			From:  fromAddr,
+			To:    &contractAddr,
+			Value: value,
+			Data:  data,
+		}
+		estimatedGas, err := a.client.EstimateGas(ctx, msg)
+		if err != nil {
+			return "", fmt.Errorf("估算Gas失败: %w", err)
+		}
+		// 增加20%的安全边际
+		gasLimit = new(big.Int).Mul(big.NewInt(int64(estimatedGas)), big.NewInt(120))
+		gasLimit = new(big.Int).Div(gasLimit, big.NewInt(100))
+	}
+
+	// 如果未指定gasPrice，获取建议gasPrice
+	if gasPrice == nil || gasPrice.Cmp(big.NewInt(0)) == 0 {
+		gasPrice, err = a.client.SuggestGasPrice(ctx)
+		if err != nil {
+			return "", fmt.Errorf("获取建议GasPrice失败: %w", err)
+		}
+	}
+
+	// 构建与签名交易
+	tx := types.NewTransaction(nonce, contractAddr, value, gasLimit.Uint64(), gasPrice, data)
+	signer := types.LatestSignerForChainID(chainID)
+	signedTx, err := types.SignTx(tx, signer, priv)
+	if err != nil {
+		return "", fmt.Errorf("签名交易失败: %w", err)
+	}
+
+	// 广播交易
+	if err := a.client.SendTransaction(ctx, signedTx); err != nil {
+		return "", fmt.Errorf("广播交易失败: %w", err)
+	}
+
+	// 可选：等待打包（简化为轻量等待/立即返回hash）
+	_ = a.waitBrief(ctx)
+
+	return signedTx.Hash().Hex(), nil
+}

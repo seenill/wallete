@@ -50,6 +50,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -210,19 +211,59 @@ func (h *WalletHandler) SendTransaction(c *gin.Context) {
 	})
 }
 
-// GetERC20Balance 查询指定地址的某个 ERC20 余额
+// GetERC20Balance 查询指定地址的ERC20代币余额
+// GET /api/v1/wallets/:address/tokens/:tokenAddress/balance
+// 功能: 获取指定地址的ERC20代币余额
+// 参数: address - 路径参数，以太坊地址（0x开头）
+//
+//	tokenAddress - 路径参数，ERC20代币合约地址（0x开头）
+//
+// 返回: 包含余额信息的JSON响应（最小单位）
 func (h *WalletHandler) GetERC20Balance(c *gin.Context) {
+	// 获取路径参数
 	address := c.Param("address")
-	token := c.Param("tokenAddress")
-	if address == "" || token == "" {
+	tokenAddress := c.Param("tokenAddress")
+
+	// 验证参数
+	if address == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code": e.InvalidParams,
 			"msg":  e.GetMsg(e.InvalidParams),
-			"data": "address 或 tokenAddress 不能为空",
+			"data": "钱包地址不能为空",
 		})
 		return
 	}
-	bal, err := h.walletService.GetERC20Balance(address, token)
+
+	if tokenAddress == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": e.InvalidParams,
+			"msg":  e.GetMsg(e.InvalidParams),
+			"data": "代币地址不能为空",
+		})
+		return
+	}
+
+	// 验证地址格式
+	if !common.IsHexAddress(address) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": e.InvalidParams,
+			"msg":  e.GetMsg(e.InvalidParams),
+			"data": "钱包地址格式不正确",
+		})
+		return
+	}
+
+	if !common.IsHexAddress(tokenAddress) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": e.InvalidParams,
+			"msg":  e.GetMsg(e.InvalidParams),
+			"data": "代币地址格式不正确",
+		})
+		return
+	}
+
+	// 调用业务服务层获取ERC20余额
+	bal, err := h.walletService.GetERC20Balance(address, tokenAddress)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code": e.ErrorGetBalance,
@@ -231,10 +272,28 @@ func (h *WalletHandler) GetERC20Balance(c *gin.Context) {
 		})
 		return
 	}
+
+	// 获取代币元数据
+	name, symbol, decimals, err := h.walletService.GetTokenMetadata(tokenAddress)
+	if err != nil {
+		// 如果获取元数据失败，使用默认值
+		name = "Unknown Token"
+		symbol = "UNKNOWN"
+		decimals = 18
+	}
+
+	// 返回成功响应
 	c.JSON(http.StatusOK, gin.H{
 		"code": e.SUCCESS,
 		"msg":  e.GetMsg(e.SUCCESS),
-		"data": gin.H{"address": address, "token": token, "balance": bal.String()},
+		"data": gin.H{
+			"address":       address,
+			"token_address": tokenAddress,
+			"balance":       bal.String(),
+			"name":          name,
+			"symbol":        symbol,
+			"decimals":      decimals,
+		},
 	})
 }
 
@@ -297,42 +356,96 @@ func (h *WalletHandler) SendERC20(c *gin.Context) {
 	})
 }
 
-// GetNonces 获取地址的 latest 与 pending nonce
+// GetNonces 获取地址的nonce值
+// GET /api/v1/wallets/:address/nonce
+// 功能: 获取指定地址的pending和latest nonce值
+// 参数: address - 路径参数，以太坊地址（0x开头）
+// 返回: 包含nonce信息的JSON响应
 func (h *WalletHandler) GetNonces(c *gin.Context) {
+	// 获取路径参数
 	address := c.Param("address")
+
+	// 验证参数
 	if address == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"code": e.InvalidParams, "msg": e.GetMsg(e.InvalidParams), "data": "地址不能为空"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": e.InvalidParams,
+			"msg":  e.GetMsg(e.InvalidParams),
+			"data": "钱包地址不能为空",
+		})
 		return
 	}
+
+	// 验证地址格式
+	if !common.IsHexAddress(address) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": e.InvalidParams,
+			"msg":  e.GetMsg(e.InvalidParams),
+			"data": "钱包地址格式不正确",
+		})
+		return
+	}
+
+	// 调用业务服务层获取nonce值
 	pending, latest, err := h.walletService.GetNonces(address)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": e.ErrorNonceGet, "msg": e.GetMsg(e.ErrorNonceGet), "data": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": e.ErrorGetBalance,
+			"msg":  e.GetMsg(e.ErrorGetBalance),
+			"data": err.Error(),
+		})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"code": e.SUCCESS,
-		"msg":  e.GetMsg(e.SUCCESS),
-		"data": gin.H{"address": address, "nonce_latest": latest, "nonce_pending": pending},
-	})
-}
 
-// GetGasSuggestion 获取 gas 建议（EIP-1559 + legacy）
-func (h *WalletHandler) GetGasSuggestion(c *gin.Context) {
-	sug, err := h.walletService.GetGasSuggestion()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": e.ErrorGasSuggestion, "msg": e.GetMsg(e.ErrorGasSuggestion), "data": err.Error()})
-		return
-	}
+	// 返回成功响应
 	c.JSON(http.StatusOK, gin.H{
 		"code": e.SUCCESS,
 		"msg":  e.GetMsg(e.SUCCESS),
 		"data": gin.H{
-			"chain_id":  sug.ChainID.String(),
-			"base_fee":  sug.BaseFee.String(),
-			"tip_cap":   sug.TipCap.String(),
-			"max_fee":   sug.MaxFee.String(),
-			"gas_price": sug.GasPrice.String(),
+			"address": address,
+			"pending": pending,
+			"latest":  latest,
 		},
+	})
+}
+
+// GetGasSuggestion 获取Gas价格建议
+// GET /api/v1/gas-suggestion
+// 功能: 获取当前网络的Gas价格建议（支持EIP-1559和Legacy模式）
+// 返回: 包含Gas价格建议的JSON响应
+func (h *WalletHandler) GetGasSuggestion(c *gin.Context) {
+	// 调用业务服务层获取Gas价格建议
+	gasSuggestion, err := h.walletService.GetGasSuggestion()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": e.ErrorGetBalance,
+			"msg":  e.GetMsg(e.ErrorGetBalance),
+			"data": err.Error(),
+		})
+		return
+	}
+
+	// 格式化响应数据
+	response := gin.H{
+		"chain_id": gasSuggestion.ChainID.String(),
+		"gas_price": gin.H{
+			"legacy": gasSuggestion.GasPrice.String(),
+		},
+	}
+
+	// 如果支持EIP-1559，添加相关信息
+	if gasSuggestion.BaseFee != nil && gasSuggestion.BaseFee.Cmp(big.NewInt(0)) > 0 {
+		response["eip1559"] = gin.H{
+			"base_fee":                 gasSuggestion.BaseFee.String(),
+			"max_fee_per_gas":          gasSuggestion.MaxFee.String(),
+			"max_priority_fee_per_gas": gasSuggestion.TipCap.String(),
+		}
+	}
+
+	// 返回成功响应
+	c.JSON(http.StatusOK, gin.H{
+		"code": e.SUCCESS,
+		"msg":  e.GetMsg(e.SUCCESS),
+		"data": response,
 	})
 }
 

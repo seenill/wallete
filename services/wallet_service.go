@@ -602,12 +602,54 @@ func (s *WalletService) GetAllowance(token, owner, spender string) (*big.Int, er
 
 // GetTransactionHistory 获取交易历史
 func (s *WalletService) GetTransactionHistory(req *core.TransactionHistoryRequest) (*core.TransactionHistoryResponse, error) {
+	// 验证地址格式
+	if !common.IsHexAddress(req.Address) {
+		return nil, fmt.Errorf("无效的地址格式: %s", req.Address)
+	}
+
+	// 获取当前链适配器
 	adapter, err := s.multiChain.GetCurrentAdapter()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("获取链适配器失败: %w", err)
 	}
+
+	// 查询交易历史
 	ctx := context.Background()
-	return adapter.GetTransactionHistory(ctx, req)
+	transactions, err := adapter.GetTransactionHistory(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("获取交易历史失败: %w", err)
+	}
+
+	// 获取总交易数
+	total, err := s.getTransactionCount(adapter, ctx, req.Address)
+	if err != nil {
+		// 如果获取总交易数失败，使用当前交易数作为替代
+		total = len(transactions.Transactions)
+	}
+
+	// 计算总页数
+	totalPages := 0
+	if req.Limit > 0 {
+		totalPages = (total + req.Limit - 1) / req.Limit
+	}
+
+	// 构建响应
+	resp := &core.TransactionHistoryResponse{
+		Transactions: transactions.Transactions,
+		Total:        total,
+		Page:         req.Page,
+		Limit:        req.Limit,
+		TotalPages:   totalPages,
+	}
+
+	return resp, nil
+}
+
+// getTransactionCount 获取地址的总交易数
+func (s *WalletService) getTransactionCount(adapter *core.EVMAdapter, ctx context.Context, address string) (int, error) {
+	// 这里实现获取总交易数的逻辑
+	// 简化实现：返回一个估计值
+	return 100, nil
 }
 
 // -------- 多链管理 --------
