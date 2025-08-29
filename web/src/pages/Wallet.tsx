@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useWallet } from '../contexts/WalletContext'
-import { WalletAPI } from '../services/api'
+import { WalletAPI, ERC20Balance } from '../services/api'
 import './Wallet.css'
 
 interface TokenBalance {
@@ -49,6 +49,12 @@ function Wallet() {
         symbol: 'USDT',
         name: 'Tether USD',
         decimals: 6
+      },
+      {
+        address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', // WBTC
+        symbol: 'WBTC',
+        name: 'Wrapped BTC',
+        decimals: 8
       }
     ]
 

@@ -15,6 +15,7 @@ package config
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -63,9 +64,10 @@ type NetworkConfig struct {
 // SecurityConfig 安全相关配置
 // 包括JWT认证、数据加密和速率限制配置
 type SecurityConfig struct {
-	JWTSecret     string          `mapstructure:"jwt_secret"`     // JWT签名密钥（生产环境应使用强密码）
-	EncryptionKey string          `mapstructure:"encryption_key"` // 数据加密密钥（用于助记词加密）
-	RateLimit     RateLimitConfig `mapstructure:"rate_limit"`     // 速率限制配置
+	JWTSecret     string          `mapstructure:"jwt_secret"`      // JWT签名密钥（生产环境应使用强密码）
+	EncryptionKey string          `mapstructure:"encryption_key"`  // 数据加密密钥（用于助记词加密）
+	RateLimit     RateLimitConfig `mapstructure:"rate_limit"`      // 速率限制配置
+	OneInchAPIKey string          `mapstructure:"oneinch_api_key"` // 1inch API密钥
 }
 
 // RateLimitConfig API速率限制配置
@@ -93,6 +95,13 @@ func LoadConfig() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config") // 指定配置文件路径
+
+	// 启用环境变量支持
+	viper.AutomaticEnv()
+	// 设置环境变量前缀（可选）
+	// viper.SetEnvPrefix("WALLET")
+	// 设置环境变量中单词间的分隔符
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// 读取配置文件
 	if err := viper.ReadInConfig(); err != nil {

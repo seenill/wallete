@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useWallet } from '../contexts/WalletContext'
+import { WalletAPI } from '../services/api'
 import './Settings.css'
 
 function Settings() {
@@ -7,6 +8,8 @@ function Settings() {
   const { state, disconnectWallet, formatBalance } = useWallet()
   const [showMnemonic, setShowMnemonic] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
+  const [sessionInfo, setSessionInfo] = useState<{id: string, expireAt: number} | null>(null)
+  const [isCreatingSession, setIsCreatingSession] = useState(false)
 
   const handleDisconnect = () => {
     disconnectWallet()
@@ -20,6 +23,38 @@ function Settings() {
     } catch (error) {
       console.error('Failed to copy:', error)
     }
+  }
+
+  const createSession = async () => {
+    if (!state.mnemonic) return
+    
+    setIsCreatingSession(true)
+    try {
+      const response = await WalletAPI.createSession({
+        mnemonic: state.mnemonic,
+        ttl_seconds: 3600 // 1小时有效期
+      })
+      
+      if (response.code === 200) {
+        setSessionInfo({
+          id: response.data.session_id,
+          expireAt: response.data.expire_at
+        })
+        alert('会话创建成功！')
+      } else {
+        alert('会话创建失败: ' + response.msg)
+      }
+    } catch (error) {
+      console.error('Failed to create session:', error)
+      alert('会话创建失败')
+    } finally {
+      setIsCreatingSession(false)
+    }
+  }
+
+  const formatExpireTime = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000)
+    return date.toLocaleString()
   }
 
   if (!state.isConnected) {
@@ -100,6 +135,45 @@ function Settings() {
                 >
                   复制助记词
                 </button>
+              </div>
+            )}
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <div className="setting-label">创建会话</div>
+                <div className="setting-description">
+                  创建临时会话以避免重复输入助记词，会话将在一定时间后过期。
+                </div>
+              </div>
+              <button
+                onClick={createSession}
+                disabled={isCreatingSession || !!sessionInfo}
+                className="toggle-btn"
+              >
+                {isCreatingSession ? '创建中...' : sessionInfo ? '已创建' : '创建'}
+              </button>
+            </div>
+
+            {sessionInfo && (
+              <div className="session-info">
+                <div className="setting-item">
+                  <div className="setting-label">会话ID</div>
+                  <div className="setting-value">
+                    <span className="session-id">{sessionInfo.id}</span>
+                    <button
+                      onClick={() => copyToClipboard(sessionInfo.id)}
+                      className="copy-btn-small"
+                    >
+                      复制
+                    </button>
+                  </div>
+                </div>
+                <div className="setting-item">
+                  <div className="setting-label">过期时间</div>
+                  <div className="setting-value">
+                    {formatExpireTime(sessionInfo.expireAt)}
+                  </div>
+                </div>
               </div>
             )}
           </div>

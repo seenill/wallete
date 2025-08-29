@@ -83,6 +83,12 @@ func (a *EVMAdapter) GetBalance(ctx context.Context, address string) (*big.Int, 
 	return bal, nil
 }
 
+// SendTransaction 发送原生代币交易（实现ChainAdapter接口）
+func (a *EVMAdapter) SendTransaction(ctx context.Context, from, to string, amount *big.Int, mnemonic string) (string, error) {
+	// 使用默认派生路径
+	return a.SendETH(ctx, mnemonic, "m/44'/60'/0'/0/0", to, amount)
+}
+
 // SendETH 发送原生代币交易（ETH/MATIC/BNB等）
 // 使用助记词派生的私钥进行交易签名，支持Legacy Gas模式
 // 参数:
@@ -287,47 +293,40 @@ func (a *EVMAdapter) GetNonces(ctx context.Context, address string) (pending uin
 	return pending, latest, nil
 }
 
-// GetGasSuggestion 返回当前链的 gas 建议（支持 EIP-1559）
+// GetGasSuggestion 获取Gas建议（实现ChainAdapter接口）
 func (a *EVMAdapter) GetGasSuggestion(ctx context.Context) (*GasSuggestion, error) {
 	chainID, err := a.client.NetworkID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取链ID失败: %w", err)
 	}
 
-	// 取最新区块头，尝试获取 baseFee
-	header, err := a.client.HeaderByNumber(ctx, nil)
+	// 获取基础费用（EIP-1559）
+	baseFee, err := a.client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("获取区块头失败: %w", err)
-	}
-	var baseFee = new(big.Int)
-	if header.BaseFee != nil {
-		baseFee = new(big.Int).Set(header.BaseFee)
-	} else {
 		baseFee = big.NewInt(0)
 	}
 
-	// 建议 tip（maxPriorityFeePerGas）
-	tip, err := a.client.SuggestGasTipCap(ctx)
+	// 获取小费上限（EIP-1559）
+	tipCap, err := a.client.SuggestGasTipCap(ctx)
 	if err != nil {
-		// 可能为不支持 EIP-1559 的网络，降级为 0
-		tip = big.NewInt(0)
+		tipCap = big.NewInt(0)
 	}
 
-	// 计算 maxFee = tip + 2*baseFee（常见保守策略）
-	maxFee := new(big.Int).Add(tip, new(big.Int).Mul(baseFee, big.NewInt(2)))
+	// 计算最大费用（EIP-1559）
+	maxFee := new(big.Int).Add(baseFee, new(big.Int).Mul(tipCap, big.NewInt(2)))
 
-	// legacy gasPrice 建议
-	gp, err := a.client.SuggestGasPrice(ctx)
+	// 获取传统Gas价格
+	gasPrice, err := a.client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("获取建议GasPrice失败: %w", err)
+		gasPrice = big.NewInt(0)
 	}
 
 	return &GasSuggestion{
 		ChainID:  chainID,
 		BaseFee:  baseFee,
-		TipCap:   tip,
+		TipCap:   tipCap,
 		MaxFee:   maxFee,
-		GasPrice: gp,
+		GasPrice: gasPrice,
 	}, nil
 }
 
@@ -1060,7 +1059,7 @@ func (a *EVMAdapter) collectTransactionsInBatch(ctx context.Context, addr common
 	for blockNum := startBlock; blockNum <= endBlock; blockNum++ {
 		block, err := a.client.BlockByNumber(ctx, new(big.Int).SetUint64(blockNum))
 		if err != nil {
-			continue // 跳过获取失败的区块
+			continue // 跽过获取失败的区块
 		}
 
 		for _, tx := range block.Transactions() {
@@ -1310,4 +1309,15 @@ func (a *EVMAdapter) SendContractTransaction(ctx context.Context, mnemonic, deri
 	_ = a.waitBrief(ctx)
 
 	return signedTx.Hash().Hex(), nil
+}
+
+// GetTokenBalance 获取代币余额（实现TokenSupporter接口）
+func (a *EVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress, ownerAddress string) (*big.Int, error) {
+	return a.GetERC20Balance(ctx, tokenAddress, ownerAddress)
+}
+
+// SendTokenTransaction 发送代币交易（实现TokenSupporter接口）
+func (a *EVMAdapter) SendTokenTransaction(ctx context.Context, from, to, tokenAddress string, amount *big.Int, mnemonic string) (string, error) {
+	// 使用默认派生路径
+	return a.SendERC20(ctx, mnemonic, "m/44'/60'/0'/0/0", tokenAddress, to, amount)
 }

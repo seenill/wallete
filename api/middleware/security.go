@@ -124,8 +124,8 @@ var (
 
 // InitRateLimiters 初始化速率限制器
 func InitRateLimiters() {
-	// 通用API：每分钟100个请求
-	generalLimiter = NewRateLimiter(100, time.Minute)
+	// 通用API：每分钟300个请求（增加限制以减少429错误）
+	generalLimiter = NewRateLimiter(300, time.Minute)
 
 	// 交易API：每分钟10个请求（更严格）
 	transactionLimiter = NewRateLimiter(10, time.Minute)

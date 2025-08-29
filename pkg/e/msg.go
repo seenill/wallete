@@ -27,6 +27,7 @@ var MsgFlags = map[int]string{
 	ErrorGasSuggestion:        "获取Gas建议失败",      // 交易费估算服务异常
 	ErrorNonceGet:             "获取Nonce失败",      // 交易顺序号获取失败
 	ErrorBroadcastRawTx:       "广播原始交易失败",       // 签名交易发送失败
+	ErrorDeFiOperation:        "DeFi操作失败",       // DeFi聚合器操作失败
 }
 
 // GetMsg 根据错误码获取对应的中文错误消息

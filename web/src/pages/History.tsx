@@ -1,22 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useWallet } from '../contexts/WalletContext'
+import { WalletAPI, TransactionInfo } from '../services/api'
 import './History.css'
-
-interface Transaction {
-  hash: string
-  from: string
-  to: string
-  value: string
-  timestamp: number
-  status: 'pending' | 'success' | 'failed'
-  type: 'send' | 'receive'
-  gasUsed?: string
-  gasPrice?: string
-}
 
 function History() {
   const { state } = useWallet()
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [transactions, setTransactions] = useState<TransactionInfo[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [filter, setFilter] = useState<'all' | 'send' | 'receive'>('all')
 
@@ -27,36 +16,24 @@ function History() {
   }, [state.address])
 
   const loadTransactionHistory = async () => {
+    if (!state.address) return
+    
     setIsLoading(true)
     try {
-      // 这里应该调用实际的API来获取交易历史
-      // 现在使用模拟数据
-      const mockTransactions: Transaction[] = [
-        {
-          hash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-          from: '0x742d35Cc6634C0532925a3b8D48C6f92c3b8fAd7',
-          to: state.address || '',
-          value: '1000000000000000000', // 1 ETH
-          timestamp: Date.now() - 3600000, // 1 hour ago
-          status: 'success',
-          type: 'receive',
-          gasUsed: '21000',
-          gasPrice: '20000000000'
-        },
-        {
-          hash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-          from: state.address || '',
-          to: '0x8ba1f109551bD432803012645Hac136c30b9c',
-          value: '500000000000000000', // 0.5 ETH
-          timestamp: Date.now() - 7200000, // 2 hours ago
-          status: 'success',
-          type: 'send',
-          gasUsed: '21000',
-          gasPrice: '18000000000'
-        }
-      ]
+      const response = await WalletAPI.getTransactionHistory({
+        address: state.address,
+        page: 1,
+        limit: 20,
+        tx_type: 'all',
+        sort_by: 'timestamp',
+        sort_order: 'desc'
+      })
       
-      setTransactions(mockTransactions)
+      if (response.code === 200) {
+        setTransactions(response.data.transactions)
+      } else {
+        console.error('Failed to load transaction history:', response.msg)
+      }
     } catch (error) {
       console.error('Failed to load transaction history:', error)
     } finally {
@@ -83,7 +60,7 @@ function History() {
   }
 
   const formatTimestamp = (timestamp: number): string => {
-    const date = new Date(timestamp)
+    const date = new Date(timestamp * 1000) // 区块链时间戳通常是秒级
     const now = new Date()
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000)
     

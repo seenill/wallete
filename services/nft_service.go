@@ -194,10 +194,16 @@ type MarketTrend struct {
 
 // NewNFTService 创建NFT服务实例
 func NewNFTService(multiChain *core.MultiChainManager) (*NFTService, error) {
-	// 获取当前EVM适配器
-	evmAdapter, err := multiChain.GetCurrentAdapter()
+	// 获取当前适配器
+	adapter, err := multiChain.GetCurrentAdapter()
 	if err != nil {
-		return nil, fmt.Errorf("获取EVM适配器失败: %w", err)
+		return nil, fmt.Errorf("获取适配器失败: %w", err)
+	}
+
+	// 类型断言，检查是否为EVM适配器
+	evmAdapter, ok := adapter.(*core.EVMAdapter)
+	if !ok {
+		return nil, fmt.Errorf("NFT服务仅支持EVM链")
 	}
 
 	// 创建NFT管理器
@@ -238,10 +244,15 @@ func (s *NFTService) GetUserNFTs(ctx context.Context, address string, filters *N
 			return nil, fmt.Errorf("获取用户NFT失败: %w", err)
 		}
 
-		// 通过交易历史查询用户拥有的NFT
-		nfts, err = s.queryNFTsFromEvents(ctx, adapter, address)
-		if err != nil {
-			return nil, fmt.Errorf("获取用户NFT失败: %w", err)
+		// 类型断言，检查是否为EVM适配器
+		if evmAdapter, ok := adapter.(*core.EVMAdapter); ok {
+			// 通过交易历史查询用户拥有的NFT
+			nfts, err = s.queryNFTsFromEvents(ctx, evmAdapter, address)
+			if err != nil {
+				return nil, fmt.Errorf("获取用户NFT失败: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("当前链不支持NFT查询")
 		}
 	}
 

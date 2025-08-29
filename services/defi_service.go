@@ -46,12 +46,13 @@ import (
 // DeFiService DeFi业务服务
 // 提供完整的DeFi功能封装，包括交易、收益、流动性等服务
 type DeFiService struct {
-	multiChain    *core.MultiChainManager     // 多链管理器
-	exchanges     map[string]core.DEXExchange // 支持的交易所
-	strategies    map[string]*YieldStrategy   // 收益策略
-	userPositions map[string][]*UserPosition  // 用户仓位映射
-	priceCache    map[string]*PriceCache      // 价格缓存
-	mu            sync.RWMutex                // 读写锁
+	multiChain     *core.MultiChainManager     // 多链管理器
+	exchanges      map[string]core.DEXExchange // 支持的交易所
+	strategies     map[string]*YieldStrategy   // 收益策略
+	userPositions  map[string][]*UserPosition  // 用户仓位映射
+	priceCache     map[string]*PriceCache      // 价格缓存
+	oneInchService *OneInchService             // 1inch聚合器服务
+	mu             sync.RWMutex                // 读写锁
 }
 
 // SwapRequest 交易请求参数
@@ -77,6 +78,16 @@ type SwapQuote struct {
 	Exchange     string           `json:"exchange"`       // 推荐交易所
 	ValidUntil   int64            `json:"valid_until"`    // 报价有效期
 	Comparison   []*ExchangeQuote `json:"comparison"`     // 多交易所比较
+	// 1inch特定字段
+	OneInchData *OneInchQuoteData `json:"oneinch_data,omitempty"` // 1inch数据
+}
+
+// OneInchQuoteData 1inch报价数据
+type OneInchQuoteData struct {
+	ToTokenAmount string `json:"to_token_amount"`
+	EstimatedGas  int64  `json:"estimated_gas"`
+	GasPrice      string `json:"gas_price"`
+	TxData        string `json:"tx_data,omitempty"`
 }
 
 // RouteInfo 路由信息
@@ -97,6 +108,8 @@ type ExchangeQuote struct {
 	GasEstimate uint64 `json:"gas_estimate"` // Gas估算
 	Rating      string `json:"rating"`       // 评级（A-F）
 	Reason      string `json:"reason"`       // 推荐理由
+	// 1inch特定字段
+	IsOneInch bool `json:"is_oneinch"` // 是否为1inch
 }
 
 // YieldStrategy 收益策略信息
@@ -190,12 +203,34 @@ func NewDeFiService(multiChain *core.MultiChainManager) *DeFiService {
 		strategies:    make(map[string]*YieldStrategy),
 		userPositions: make(map[string][]*UserPosition),
 		priceCache:    make(map[string]*PriceCache),
+		// 初始化1inch服务（需要配置API密钥）
+		oneInchService: NewOneInchService(""), // 在实际使用时需要设置API密钥
 	}
 
 	// 初始化默认策略
 	service.initDefaultStrategies()
 
 	return service
+}
+
+// SetOneInchAPIKey 设置1inch API密钥
+func (s *DeFiService) SetOneInchAPIKey(apiKey string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.oneInchService == nil {
+		s.oneInchService = NewOneInchService(apiKey)
+	} else {
+		// 重新创建服务实例以更新API密钥
+		s.oneInchService = NewOneInchService(apiKey)
+	}
+}
+
+// GetOneInchService 获取1inch服务实例（用于处理器直接调用）
+func (s *DeFiService) GetOneInchService() *OneInchService {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.oneInchService
 }
 
 // GetSwapQuote 获取交易报价
@@ -224,6 +259,7 @@ func (s *DeFiService) GetSwapQuote(req *SwapRequest) (*SwapQuote, error) {
 			GasEstimate: quote.GasEstimate,
 			Rating:      s.calculateExchangeRating(quote),
 			Reason:      s.getRecommendationReason(name, quote),
+			IsOneInch:   false,
 		}
 		quotes = append(quotes, exchangeQuote)
 
@@ -231,6 +267,50 @@ func (s *DeFiService) GetSwapQuote(req *SwapRequest) (*SwapQuote, error) {
 		if bestQuote.AmountOut == nil || quote.AmountOut.Cmp(bestQuote.AmountOut) > 0 {
 			bestQuote = quote
 			bestExchange = name
+		}
+	}
+
+	// 获取1inch报价（如果配置了API密钥）
+	var oneInchQuote *OneInchQuoteData
+	if s.oneInchService != nil && s.oneInchService.apiKey != "" {
+		oneInchReq := &OneInchQuoteRequest{
+			FromTokenAddress: req.TokenIn,
+			ToTokenAddress:   req.TokenOut,
+			Amount:           req.AmountIn,
+			GasPrice:         req.GasPrice,
+		}
+
+		oneInchResp, err := s.oneInchService.GetQuote(context.Background(), oneInchReq)
+		if err == nil {
+			oneInchQuote = &OneInchQuoteData{
+				ToTokenAmount: oneInchResp.ToTokenAmount,
+				EstimatedGas:  oneInchResp.EstimatedGas,
+				GasPrice:      oneInchResp.GasPrice,
+			}
+
+			// 创建1inch报价比较项
+			oneInchExchangeQuote := &ExchangeQuote{
+				Exchange:    "1inch",
+				AmountOut:   oneInchResp.ToTokenAmount,
+				GasEstimate: uint64(oneInchResp.EstimatedGas),
+				Rating:      "A+", // 1inch通常提供最优价格
+				Reason:      "聚合多个DEX，提供最优价格",
+				IsOneInch:   true,
+			}
+			quotes = append(quotes, oneInchExchangeQuote)
+
+			// 检查是否1inch提供更好的报价
+			oneInchAmountOut := new(big.Int)
+			oneInchAmountOut.SetString(oneInchResp.ToTokenAmount, 10)
+
+			if bestQuote.AmountOut == nil || oneInchAmountOut.Cmp(bestQuote.AmountOut) > 0 {
+				bestQuote = &core.QuoteResult{
+					AmountOut:    oneInchAmountOut,
+					AmountOutMin: oneInchAmountOut, // 简化处理
+					GasEstimate:  uint64(oneInchResp.EstimatedGas),
+				}
+				bestExchange = "1inch"
+			}
 		}
 	}
 
@@ -275,6 +355,7 @@ func (s *DeFiService) GetSwapQuote(req *SwapRequest) (*SwapQuote, error) {
 		Exchange:     bestExchange,
 		ValidUntil:   bestQuote.ValidUntil,
 		Comparison:   quotes,
+		OneInchData:  oneInchQuote,
 	}, nil
 }
 
@@ -294,6 +375,11 @@ func (s *DeFiService) ExecuteSwap(req *SwapRequest, sessionID string) (*core.Swa
 	// 风险检查
 	if err := s.performRiskCheck(req, quote); err != nil {
 		return nil, fmt.Errorf("risk check failed: %w", err)
+	}
+
+	// 如果是1inch交易，使用1inch执行
+	if quote.Exchange == "1inch" && s.oneInchService != nil && s.oneInchService.apiKey != "" {
+		return s.executeOneInchSwap(req, quote)
 	}
 
 	// 获取对应的交易所
@@ -324,6 +410,51 @@ func (s *DeFiService) ExecuteSwap(req *SwapRequest, sessionID string) (*core.Swa
 	result, err := exchange.ExecuteSwap(ctx, swapParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute swap: %w", err)
+	}
+
+	// 记录交易历史
+	s.recordSwapHistory(req.UserAddress, result)
+
+	return result, nil
+}
+
+// executeOneInchSwap 执行1inch交换
+func (s *DeFiService) executeOneInchSwap(req *SwapRequest, quote *SwapQuote) (*core.SwapResult, error) {
+	// 构建1inch交换请求
+	slippage := "1" // 默认1%滑点
+	if req.Slippage != "" {
+		slippage = req.Slippage
+	}
+
+	oneInchReq := &OneInchSwapRequest{
+		FromTokenAddress: req.TokenIn,
+		ToTokenAddress:   req.TokenOut,
+		Amount:           req.AmountIn,
+		FromAddress:      req.UserAddress,
+		Slippage:         slippage,
+		GasPrice:         req.GasPrice,
+	}
+
+	// 获取交换数据
+	swapResp, err := s.oneInchService.GetSwap(context.Background(), oneInchReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 1inch swap data: %w", err)
+	}
+
+	// 构建交换结果
+	amountOut := new(big.Int)
+	amountOut.SetString(swapResp.ToTokenAmount, 10)
+
+	gasPrice := new(big.Int)
+	gasPrice.SetString(swapResp.Tx.GasPrice, 10)
+
+	result := &core.SwapResult{
+		TxHash:    "", // 交易哈希将在实际发送后获得
+		AmountOut: amountOut,
+		GasUsed:   uint64(swapResp.Tx.Gas),
+		GasPrice:  gasPrice,
+		Status:    "success",
+		Exchange:  "1inch",
 	}
 
 	// 记录交易历史
@@ -402,19 +533,86 @@ func (s *DeFiService) GetLiquidityPools(exchange string, sortBy string) ([]*Liqu
 			continue
 		}
 
-		for _, pool := range corePools {
-			poolInfo := s.convertToLiquidityPoolInfo(pool, name)
-			pools = append(pools, poolInfo)
+		for _, corePool := range corePools {
+			pool := &LiquidityPoolInfo{
+				Address:  corePool.Address,
+				Name:     corePool.Name,
+				Exchange: name,
+				TokenA: &TokenInfo{
+					Address:  corePool.TokenA.Address,
+					Symbol:   corePool.TokenA.Symbol,
+					Name:     corePool.TokenA.Name,
+					Decimals: corePool.TokenA.Decimals,
+					LogoURL:  corePool.TokenA.LogoURL,
+				},
+				TokenB: &TokenInfo{
+					Address:  corePool.TokenB.Address,
+					Symbol:   corePool.TokenB.Symbol,
+					Name:     corePool.TokenB.Name,
+					Decimals: corePool.TokenB.Decimals,
+					LogoURL:  corePool.TokenB.LogoURL,
+				},
+				TVL:       corePool.TVL.String(),
+				APY:       corePool.APY,
+				Volume24h: corePool.Volume24h.String(),
+				Fee:       corePool.Fee,
+			}
+
+			// 添加奖励信息
+			for _, rewardToken := range corePool.RewardTokens {
+				reward := &RewardInfo{
+					Token: &TokenInfo{
+						Address:  rewardToken.Address,
+						Symbol:   rewardToken.Symbol,
+						Name:     rewardToken.Name,
+						Decimals: rewardToken.Decimals,
+						LogoURL:  rewardToken.LogoURL,
+					},
+					APY:    "0", // 简化处理，实际应从其他来源获取
+					Amount: "0", // 简化处理，实际应从其他来源获取
+				}
+				pool.Rewards = append(pool.Rewards, reward)
+			}
+
+			pools = append(pools, pool)
 		}
 	}
 
-	// 排序
-	s.sortLiquidityPools(pools, sortBy)
+	// 根据指定字段排序
+	switch strings.ToLower(sortBy) {
+	case "tvl":
+		sort.Slice(pools, func(i, j int) bool {
+			return parseFloatFromString(pools[i].TVL) > parseFloatFromString(pools[j].TVL)
+		})
+	case "apy":
+		sort.Slice(pools, func(i, j int) bool {
+			return parseFloatFromString(pools[i].APY) > parseFloatFromString(pools[j].APY)
+		})
+	case "volume":
+		sort.Slice(pools, func(i, j int) bool {
+			return parseFloatFromString(pools[i].Volume24h) > parseFloatFromString(pools[j].Volume24h)
+		})
+	default:
+		// 默认按TVL排序
+		sort.Slice(pools, func(i, j int) bool {
+			return parseFloatFromString(pools[i].TVL) > parseFloatFromString(pools[j].TVL)
+		})
+	}
 
 	return pools, nil
 }
 
-// 辅助方法
+// 辅助函数
+func parseFloatFromString(s string) float64 {
+	if s == "" {
+		return 0
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0
+	}
+	return f
+}
 
 // initDefaultStrategies 初始化默认策略
 func (s *DeFiService) initDefaultStrategies() {
@@ -571,16 +769,4 @@ func (s *DeFiService) sortLiquidityPools(pools []*LiquidityPoolInfo, sortBy stri
 			return volI > volJ
 		})
 	}
-}
-
-// parseFloatFromString 从字符串解析浮点数
-func parseFloatFromString(s string) float64 {
-	// 移除百分号和其他符号
-	cleaned := strings.TrimSuffix(strings.TrimSpace(s), "%")
-
-	// 尝试解析为浮点数
-	if f, err := strconv.ParseFloat(cleaned, 64); err == nil {
-		return f
-	}
-	return 0.0
 }

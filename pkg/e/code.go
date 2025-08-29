@@ -45,4 +45,5 @@ const (
 	ErrorGasSuggestion        = 10011 // 获取Gas建议失败
 	ErrorNonceGet             = 10012 // 获取Nonce失败
 	ErrorBroadcastRawTx       = 10013 // 广播原始交易失败
+	ErrorDeFiOperation        = 10014 // DeFi操作失败
 )

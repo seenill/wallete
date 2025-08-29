@@ -46,13 +46,13 @@ import (
 
 // AdvancedTradingManager 高级交易管理器
 type AdvancedTradingManager struct {
-	evmAdapter     *EVMAdapter                 // EVM适配器
-	multiChain     *MultiChainManager          // 多链管理器
-	batchExecutor  *BatchExecutor              // 批量执行器
-	scheduledTxs   map[string]*ScheduledTx     // 定时交易
-	conditionalTxs map[string]*ConditionalTx   // 条件交易
-	strategies     map[string]*TradingStrategy // 交易策略
-	mu             sync.RWMutex                // 读写锁
+	evmAdapter     ChainAdapter // 修改为ChainAdapter接口类型
+	multiChain     *MultiChainManager
+	batchExecutor  *BatchExecutor
+	scheduledTxs   map[string]*ScheduledTx
+	conditionalTxs map[string]*ConditionalTx
+	strategies     map[string]*TradingStrategy
+	mu             sync.RWMutex
 }
 
 // BatchExecutor 批量交易执行器
@@ -282,13 +282,13 @@ type GasStrategy struct {
 
 // NewAdvancedTradingManager 创建高级交易管理器
 func NewAdvancedTradingManager(multiChain *MultiChainManager) (*AdvancedTradingManager, error) {
-	evmAdapter, err := multiChain.GetCurrentAdapter()
+	adapter, err := multiChain.GetCurrentAdapter()
 	if err != nil {
-		return nil, fmt.Errorf("获取EVM适配器失败: %w", err)
+		return nil, fmt.Errorf("获取适配器失败: %w", err)
 	}
 
 	return &AdvancedTradingManager{
-		evmAdapter:     evmAdapter,
+		evmAdapter:     adapter,
 		multiChain:     multiChain,
 		batchExecutor:  NewBatchExecutor(),
 		scheduledTxs:   make(map[string]*ScheduledTx),

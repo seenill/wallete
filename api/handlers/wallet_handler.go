@@ -40,6 +40,7 @@ package handlers
 import (
 	"math/big"
 	"net/http"
+	"time"
 	"wallet/core"
 	"wallet/pkg/e"
 	"wallet/services"
@@ -501,8 +502,8 @@ func (h *WalletHandler) BroadcastRawTransaction(c *gin.Context) {
 // -------- 新增：会话与批量派生、只读钱包 --------
 
 type CreateSessionRequest struct {
-	Mnemonic   string `json:"mnemonic" binding:"required"`
-	TTLSeconds int    `json:"ttl_seconds"` // 可选，默认 900，最大 86400
+	Mnemonic       string `json:"mnemonic" binding:"required"`
+	DerivationPath string `json:"derivation_path"` // 默认 "m/44'/60'/0'/0"
 }
 
 func (h *WalletHandler) CreateSession(c *gin.Context) {
@@ -511,27 +512,26 @@ func (h *WalletHandler) CreateSession(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": e.InvalidParams, "msg": e.GetMsg(e.InvalidParams), "data": err.Error()})
 		return
 	}
-	id, exp, err := h.walletService.CreateSession(req.Mnemonic, req.TTLSeconds)
+	sessionID, err := h.walletService.CreateSession(req.Mnemonic, req.DerivationPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": e.ErrorWalletImport, "msg": e.GetMsg(e.ErrorWalletImport), "data": err.Error()})
 		return
 	}
+	// 默认会话有效期1小时
+	expireAt := time.Now().Add(1 * time.Hour)
 	c.JSON(http.StatusOK, gin.H{"code": e.SUCCESS, "msg": e.GetMsg(e.SUCCESS), "data": gin.H{
-		"session_id": id,
-		"expire_at":  exp.Unix(),
+		"session_id": sessionID,
+		"expire_at":  expireAt.Unix(),
 	}})
 }
 
 func (h *WalletHandler) CloseSession(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
+	sessionID := c.Param("id")
+	if sessionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"code": e.InvalidParams, "msg": e.GetMsg(e.InvalidParams), "data": "session_id 不能为空"})
 		return
 	}
-	if err := h.walletService.CloseSession(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": e.InvalidParams, "msg": e.GetMsg(e.InvalidParams), "data": err.Error()})
-		return
-	}
+	h.walletService.ClearSession(sessionID)
 	c.JSON(http.StatusOK, gin.H{"code": e.SUCCESS, "msg": e.GetMsg(e.SUCCESS), "data": "ok"})
 }
 

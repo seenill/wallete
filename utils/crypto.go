@@ -13,6 +13,7 @@ package utils
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"math/big"
@@ -196,6 +197,20 @@ func GenerateSessionID() string {
 func GenerateAPIKey(prefix string) string {
 	randomPart := GenerateRandomString(32)
 	return prefix + randomPart
+}
+
+/**
+ * SHA256哈希函数
+ * 对输入数据进行SHA256哈希计算
+ *
+ * @param data 输入数据
+ * @return []byte 哈希结果
+ */
+func Sha256Hash(data []byte) []byte {
+	// 导入crypto/sha256包
+	// 这里只是示例，实际使用时需要在文件顶部导入包
+	hash := sha256.Sum256(data)
+	return hash[:]
 }
 
 // =============================================================================

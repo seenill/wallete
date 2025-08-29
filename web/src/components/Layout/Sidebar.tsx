@@ -48,6 +48,22 @@ function Sidebar() {
         </NavLink>
 
         <NavLink
+          to="/tokens"
+          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <span className="sidebar-icon">🪙</span>
+          <span className="sidebar-text">代币管理</span>
+        </NavLink>
+
+        <NavLink
+          to="/defi-swap"
+          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <span className="sidebar-icon">🔄</span>
+          <span className="sidebar-text">DeFi交换</span>
+        </NavLink>
+
+        <NavLink
           to="/settings"
           className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
         >

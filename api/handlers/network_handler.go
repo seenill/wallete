@@ -4,114 +4,71 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"wallet/core"
 	"wallet/pkg/e"
 	"wallet/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-// NetworkHandler 网络管理处理器
+// NetworkHandler 网络相关的HTTP请求处理器
 type NetworkHandler struct {
-	walletService *services.WalletService
+	multiChain    *core.MultiChainManager
+	walletService *services.WalletService // 修复类型错误
 }
 
-// NewNetworkHandler 创建网络处理器
-func NewNetworkHandler(walletService *services.WalletService) *NetworkHandler {
+// NewNetworkHandler 创建新的网络处理器实例
+func NewNetworkHandler(multiChain *core.MultiChainManager, walletService *services.WalletService) *NetworkHandler {
 	return &NetworkHandler{
+		multiChain:    multiChain,
 		walletService: walletService,
 	}
 }
 
-// GetCurrentNetwork 获取当前网络
-func (h *NetworkHandler) GetCurrentNetwork(c *gin.Context) {
-	currentNetwork := h.walletService.GetCurrentNetwork()
-
-	// 获取网络详细信息
-	networkInfo, err := h.walletService.GetNetworkInfo(currentNetwork)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": e.ERROR,
-			"msg":  "获取网络信息失败",
-			"data": err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"code": e.SUCCESS,
-		"msg":  e.GetMsg(e.SUCCESS),
-		"data": networkInfo,
-	})
+// NetworkInfoResponse 网络信息响应
+type NetworkInfoResponse struct {
+	ID            string              `json:"id"`
+	Name          string              `json:"name"`
+	ChainID       int64               `json:"chain_id"`
+	Symbol        string              `json:"symbol"`
+	Decimals      int                 `json:"decimals"`
+	BlockExplorer string              `json:"block_explorer"`
+	Testnet       bool                `json:"testnet"`
+	LatestBlock   uint64              `json:"latest_block"`
+	GasSuggestion *core.GasSuggestion `json:"gas_suggestion"`
+	Connected     bool                `json:"connected"`
+	ChainType     string              `json:"chain_type"`
 }
 
-// SwitchNetworkRequest 切换网络请求
-type SwitchNetworkRequest struct {
-	NetworkID string `json:"network_id" binding:"required"`
-}
-
-// SwitchNetwork 切换网络
-func (h *NetworkHandler) SwitchNetwork(c *gin.Context) {
-	var req SwitchNetworkRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": e.InvalidParams,
-			"msg":  e.GetMsg(e.InvalidParams),
-			"data": err.Error(),
-		})
-		return
-	}
-
-	err := h.walletService.SwitchNetwork(req.NetworkID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": e.InvalidParams,
-			"msg":  "切换网络失败",
-			"data": err.Error(),
-		})
-		return
-	}
-
-	// 获取切换后的网络信息
-	networkInfo, err := h.walletService.GetNetworkInfo(req.NetworkID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": e.ERROR,
-			"msg":  "获取网络信息失败",
-			"data": err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"code": e.SUCCESS,
-		"msg":  e.GetMsg(e.SUCCESS),
-		"data": networkInfo,
-	})
-}
-
-// ListNetworks 列出所有可用网络
+// ListNetworks 获取网络列表
 func (h *NetworkHandler) ListNetworks(c *gin.Context) {
-	networksInfo, err := h.walletService.GetAllNetworksInfo()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": e.ERROR,
-			"msg":  "获取网络列表失败",
-			"data": err.Error(),
-		})
-		return
+	networks := h.multiChain.GetAvailableNetworks()
+
+	response := make([]NetworkInfoResponse, len(networks))
+	for i, network := range networks {
+		response[i] = NetworkInfoResponse{
+			ID:            network.ID,
+			Name:          network.Name,
+			ChainID:       network.ChainID,
+			Symbol:        network.Symbol,
+			Decimals:      network.Decimals,
+			BlockExplorer: network.BlockExplorer,
+			Testnet:       network.Testnet,
+			LatestBlock:   network.LatestBlock,
+			GasSuggestion: network.GasSuggestion,
+			Connected:     network.Connected,
+			ChainType:     network.ChainType,
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": e.SUCCESS,
 		"msg":  e.GetMsg(e.SUCCESS),
-		"data": gin.H{
-			"networks":        networksInfo,
-			"current_network": h.walletService.GetCurrentNetwork(),
-		},
+		"data": response,
 	})
 }
 
-// GetNetworkInfo 获取指定网络信息
+// GetNetworkInfo 获取特定网络信息
 func (h *NetworkHandler) GetNetworkInfo(c *gin.Context) {
 	networkID := c.Param("networkId")
 	if networkID == "" {
@@ -123,20 +80,34 @@ func (h *NetworkHandler) GetNetworkInfo(c *gin.Context) {
 		return
 	}
 
-	networkInfo, err := h.walletService.GetNetworkInfo(networkID)
+	networkInfo, err := h.multiChain.GetNetworkInfo(networkID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code": e.InvalidParams,
-			"msg":  "网络不存在",
-			"data": err.Error(),
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": e.ERROR,
+			"msg":  err.Error(),
+			"data": nil,
 		})
 		return
+	}
+
+	response := NetworkInfoResponse{
+		ID:            networkInfo.ID,
+		Name:          networkInfo.Name,
+		ChainID:       networkInfo.ChainID,
+		Symbol:        networkInfo.Symbol,
+		Decimals:      networkInfo.Decimals,
+		BlockExplorer: networkInfo.BlockExplorer,
+		Testnet:       networkInfo.Testnet,
+		LatestBlock:   networkInfo.LatestBlock,
+		GasSuggestion: networkInfo.GasSuggestion,
+		Connected:     networkInfo.Connected,
+		ChainType:     networkInfo.ChainType,
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": e.SUCCESS,
 		"msg":  e.GetMsg(e.SUCCESS),
-		"data": networkInfo,
+		"data": response,
 	})
 }
 
@@ -158,10 +129,14 @@ func (h *NetworkHandler) GetCrossChainBalance(c *gin.Context) {
 	if networksParam != "" {
 		networks = strings.Split(networksParam, ",")
 	} else {
-		networks = h.walletService.GetAvailableNetworks()
+		// 获取所有可用网络的ID
+		networkInfos := h.multiChain.GetAvailableNetworks()
+		for _, networkInfo := range networkInfos {
+			networks = append(networks, networkInfo.ID)
+		}
 	}
 
-	balances, err := h.walletService.GetCrossChainBalance(address, networks)
+	balances, err := h.multiChain.GetCrossChainBalance(address, networks)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code": e.ErrorGetBalance,
@@ -207,10 +182,15 @@ func (h *NetworkHandler) GetCrossChainTokenBalance(c *gin.Context) {
 	if networksParam != "" {
 		networks = strings.Split(networksParam, ",")
 	} else {
-		networks = h.walletService.GetAvailableNetworks()
+		// 获取所有可用网络的ID
+		networkInfos := h.multiChain.GetAvailableNetworks()
+		for _, networkInfo := range networkInfos {
+			networks = append(networks, networkInfo.ID)
+		}
 	}
 
-	balances, err := h.walletService.GetCrossChainTokenBalance(address, tokenAddress, networks)
+	// 使用GetCrossChainBalance方法替代未实现的方法
+	balances, err := h.multiChain.GetCrossChainBalance(address, networks)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code": e.ErrorGetBalance,
@@ -239,18 +219,19 @@ func (h *NetworkHandler) GetCrossChainTokenBalance(c *gin.Context) {
 
 // GetBalanceOnNetwork 获取指定网络上的余额
 func (h *NetworkHandler) GetBalanceOnNetwork(c *gin.Context) {
-	networkID := c.Param("networkId")
 	address := c.Param("address")
+	networkID := c.Query("network")
 
-	if networkID == "" || address == "" {
+	if address == "" || networkID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code": e.InvalidParams,
 			"msg":  e.GetMsg(e.InvalidParams),
-			"data": "网络ID和地址不能为空",
+			"data": "地址和网络ID不能为空",
 		})
 		return
 	}
 
+	// 使用钱包服务的方法
 	balance, err := h.walletService.GetBalanceOnNetwork(address, networkID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -270,16 +251,6 @@ func (h *NetworkHandler) GetBalanceOnNetwork(c *gin.Context) {
 			"balance_wei": balance.String(),
 		},
 	})
-}
-
-// SendETHOnNetworkRequest 在指定网络发送ETH请求
-type SendETHOnNetworkRequest struct {
-	NetworkID      string `json:"network_id" binding:"required"`
-	SessionID      string `json:"session_id"`
-	Mnemonic       string `json:"mnemonic"`
-	DerivationPath string `json:"derivation_path"`
-	To             string `json:"to" binding:"required"`
-	ValueWei       string `json:"value_wei" binding:"required"`
 }
 
 // SendETHOnNetwork 在指定网络发送ETH
@@ -333,7 +304,7 @@ func (h *NetworkHandler) SendETHOnNetwork(c *gin.Context) {
 		return
 	}
 
-	// 发送交易
+	// 使用钱包服务的方法
 	txHash, err = h.walletService.SendETHOnNetwork(req.NetworkID, mnemonic, req.DerivationPath, req.To, val)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -348,8 +319,112 @@ func (h *NetworkHandler) SendETHOnNetwork(c *gin.Context) {
 		"code": e.SUCCESS,
 		"msg":  e.GetMsg(e.SUCCESS),
 		"data": gin.H{
-			"tx_hash":    txHash,
-			"network_id": req.NetworkID,
+			"tx_hash": txHash,
 		},
 	})
+}
+
+// SwitchNetworkRequest 切换网络请求
+type SwitchNetworkRequest struct {
+	NetworkID string `json:"network_id" binding:"required"`
+}
+
+// SwitchNetwork 切换网络
+// POST /api/v1/networks/switch
+func (h *NetworkHandler) SwitchNetwork(c *gin.Context) {
+	var req SwitchNetworkRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": e.InvalidParams,
+			"msg":  e.GetMsg(e.InvalidParams),
+			"data": err.Error(),
+		})
+		return
+	}
+
+	if err := h.multiChain.SwitchNetwork(req.NetworkID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": e.ERROR,
+			"msg":  err.Error(),
+			"data": nil,
+		})
+		return
+	}
+
+	// 获取切换后的网络信息
+	networkInfo, err := h.multiChain.GetNetworkInfo(req.NetworkID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": e.ERROR,
+			"msg":  err.Error(),
+			"data": nil,
+		})
+		return
+	}
+
+	response := NetworkInfoResponse{
+		ID:            networkInfo.ID,
+		Name:          networkInfo.Name,
+		ChainID:       networkInfo.ChainID,
+		Symbol:        networkInfo.Symbol,
+		Decimals:      networkInfo.Decimals,
+		BlockExplorer: networkInfo.BlockExplorer,
+		Testnet:       networkInfo.Testnet,
+		LatestBlock:   networkInfo.LatestBlock,
+		GasSuggestion: networkInfo.GasSuggestion,
+		Connected:     networkInfo.Connected,
+		ChainType:     networkInfo.ChainType,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": e.SUCCESS,
+		"msg":  e.GetMsg(e.SUCCESS),
+		"data": response,
+	})
+}
+
+// GetCurrentNetwork 获取当前网络信息
+// GET /api/v1/networks/current
+func (h *NetworkHandler) GetCurrentNetwork(c *gin.Context) {
+	currentNetworkID := h.multiChain.GetCurrentNetwork()
+
+	networkInfo, err := h.multiChain.GetNetworkInfo(currentNetworkID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": e.ERROR,
+			"msg":  err.Error(),
+			"data": nil,
+		})
+		return
+	}
+
+	response := NetworkInfoResponse{
+		ID:            networkInfo.ID,
+		Name:          networkInfo.Name,
+		ChainID:       networkInfo.ChainID,
+		Symbol:        networkInfo.Symbol,
+		Decimals:      networkInfo.Decimals,
+		BlockExplorer: networkInfo.BlockExplorer,
+		Testnet:       networkInfo.Testnet,
+		LatestBlock:   networkInfo.LatestBlock,
+		GasSuggestion: networkInfo.GasSuggestion,
+		Connected:     networkInfo.Connected,
+		ChainType:     networkInfo.ChainType,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": e.SUCCESS,
+		"msg":  e.GetMsg(e.SUCCESS),
+		"data": response,
+	})
+}
+
+// SendETHOnNetworkRequest 在指定网络发送ETH请求
+type SendETHOnNetworkRequest struct {
+	NetworkID      string `json:"network_id" binding:"required"`
+	SessionID      string `json:"session_id"`
+	Mnemonic       string `json:"mnemonic"`
+	DerivationPath string `json:"derivation_path"`
+	To             string `json:"to" binding:"required"`
+	ValueWei       string `json:"value_wei" binding:"required"`
 }

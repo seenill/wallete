@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { WalletProvider } from './contexts/WalletContext'
+import { NetworkProvider } from './contexts/NetworkContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout/Layout'
 import Home from './pages/Home'
@@ -9,13 +10,15 @@ import Send from './pages/Send'
 import Receive from './pages/Receive'
 import History from './pages/History'
 import Settings from './pages/Settings'
+import Tokens from './pages/Tokens'
+import DeFiSwap from './pages/DeFiSwap'
 import './App.css'
 
 /**
  * 主应用组件
  * 
  * 这是整个React应用的根组件，负责：
- * 1. 设置全局状态管理（WalletProvider）
+ * 1. 设置全局状态管理（WalletProvider, NetworkProvider）
  * 2. 配置路由系统（React Router）
  * 3. 错误边界处理（ErrorBoundary）
  * 4. 布局系统（Layout）
@@ -30,18 +33,22 @@ function App() {
   return (
     <ErrorBoundary>
       <WalletProvider>
-        <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/wallet" element={<Wallet />} />
-              <Route path="/send" element={<Send />} />
-              <Route path="/receive" element={<Receive />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </Layout>
-        </Router>
+        <NetworkProvider>
+          <Router>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/wallet" element={<Wallet />} />
+                <Route path="/send" element={<Send />} />
+                <Route path="/receive" element={<Receive />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/tokens" element={<Tokens />} />
+                <Route path="/defi-swap" element={<DeFiSwap />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </Layout>
+          </Router>
+        </NetworkProvider>
       </WalletProvider>
     </ErrorBoundary>
   )

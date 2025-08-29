@@ -15,6 +15,9 @@ import React, { createContext, useContext, useReducer, ReactNode } from 'react'
 import { ethers } from 'ethers'
 import { handleApiError } from '../utils/errorHandler'
 
+// 创建上下文
+const WalletContext = createContext<WalletContextType | undefined>(undefined)
+
 // =============================================================================
 // 钱包状态类型定义
 // =============================================================================
@@ -38,6 +41,8 @@ export interface WalletState {
   isLoading: boolean
   /** 错误信息，用于显示给用户 */
   error: string | null
+  /** 当前网络的钱包地址（根据不同链类型可能不同） */
+  chainAddress: string | null
 }
 
 // =============================================================================
@@ -68,6 +73,8 @@ export type WalletAction =
   | { type: 'DISCONNECT_WALLET' }
   /** 清除错误信息 */
   | { type: 'CLEAR_ERROR' }
+  /** 设置当前链的地址 */
+  | { type: 'SET_CHAIN_ADDRESS'; payload: string | null }
 
 // =============================================================================
 // 状态管理实现
@@ -86,6 +93,7 @@ const initialState: WalletState = {
   mnemonic: null,        // 没有助记词
   isLoading: false,      // 非加载状态
   error: null,           // 没有错误
+  chainAddress: null,    // 没有链地址
 }
 
 /**
@@ -134,6 +142,12 @@ function walletReducer(state: WalletState, action: WalletAction): WalletState {
         balance: action.payload,     // 更新余额
       }
     
+    case 'SET_CHAIN_ADDRESS':
+      return {
+        ...state,
+        chainAddress: action.payload, // 更新链地址
+      }
+    
     case 'DISCONNECT_WALLET':
       return {
         ...initialState,             // 重置为初始状态
@@ -160,10 +174,8 @@ interface WalletContextType {
   disconnectWallet: () => void
   updateBalance: () => Promise<void>
   formatBalance: (balanceWei: string) => string
+  updateChainAddress: (address: string | null) => void
 }
-
-// 创建上下文
-const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
 // Provider 组件
 export function WalletProvider({ children }: { children: ReactNode }) {
@@ -355,6 +367,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // 更新链地址
+  const updateChainAddress = (address: string | null) => {
+    dispatch({ type: 'SET_CHAIN_ADDRESS', payload: address })
+  }
+
   // 格式化余额显示
   const formatBalance = (balanceWei: string): string => {
     try {
@@ -380,6 +397,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     disconnectWallet,
     updateBalance,
     formatBalance,
+    updateChainAddress,
   }
 
   return (

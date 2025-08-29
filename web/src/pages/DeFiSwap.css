@@ -1,0 +1,193 @@
+.defi-swap {
+  padding: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.defi-swap-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+}
+
+.defi-swap h1 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.defi-swap p {
+  text-align: center;
+  color: #666;
+  margin-bottom: 24px;
+}
+
+.swap-card {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.token-input, .token-output {
+  margin-bottom: 16px;
+}
+
+.token-input label, .token-output label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.token-selector {
+  display: flex;
+  gap: 10px;
+}
+
+.token-selector select {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  font-size: 16px;
+}
+
+.token-selector input {
+  flex: 2;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.swap-switch {
+  text-align: center;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 20px;
+  color: #666;
+}
+
+.swap-switch:hover {
+  color: #007bff;
+}
+
+.slippage-setting {
+  margin: 20px 0;
+}
+
+.slippage-setting label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.slippage-options {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.slippage-btn {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+}
+
+.slippage-btn.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.slippage-options input {
+  width: 80px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.quote-info {
+  background: #e9ecef;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 16px 0;
+}
+
+.quote-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.quote-row:last-child {
+  margin-bottom: 0;
+}
+
+.quote-row span:first-child {
+  color: #666;
+}
+
+.quote-row span:last-child {
+  font-weight: 500;
+}
+
+.swap-button {
+  width: 100%;
+  padding: 16px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+.swap-button:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.swap-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.success-message {
+  background: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.defi-swap-not-connected {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.defi-swap-not-connected h2 {
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.defi-swap-not-connected p {
+  color: #666;
+}
